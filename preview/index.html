@@ -282,8 +282,14 @@
           ${['#e74c3c','#27ae60','#3498db','#e2b039','#9b59b6'].map(c=>`<button class="swatch" style="background:${c}" data-act="color"></button>`).join(' ')}
         </div>
         <div class="card"><b>أيقونة الخريطة</b>
+          <p class="hint">ارفع صورة، أو اختر أيقونة جاهزة. ما تظهر إلا بعد موافقة الإدارة.</p>
           <select class="inp"><option>عصابة</option><option>جمجمة</option><option>تاج</option><option>سلاح</option></select>
-          <button class="btn" data-act="icon">طلب / اعتماد الأيقونة</button></div>
+          <input type="file" id="iconfile" accept="image/png,image/jpeg,image/webp" class="hidden" />
+          <button class="btn" data-act="uploadicon">رفع صورة</button>
+          <button class="btn2" data-act="icon">إرسال للموافقة</button>
+          <div class="hint" style="margin-top:8px">معاينة</div>
+          <img id="iconprev" class="spray-thumb" alt="أيقونة" src="${g.iconImg || ''}" style="${g.iconImg?'':'display:none'}" />
+        </div>
         </div>
         <div class="card"><b>أعضاء ${g.name}</b>
           ${members.map(m=>`<div class="log">${m.name} · ${m.role}
@@ -361,9 +367,14 @@
           <button class="btn" data-act="enter" data-i="${i}">دخول</button>
         </div>`).join('')}
         <div class="card"><b>أيقونات معلّقة</b>
-          <div class="log">آل فخامة: جمجمة → تاج
-            <button class="btn ok" data-act="yes">موافقة</button>
-            <button class="btn no" data-act="no">رفض</button></div></div>`
+          <div class="log spray-item">
+            <img class="spray-thumb" alt="" src="${gangs[0].iconImg || ''}" style="${gangs[0].iconImg?'':'display:none'}" />
+            <div>آل فخامة: صورة مرفوعة / تاج</div>
+            <div>
+              <button class="btn ok" data-act="yes">موافقة</button>
+              <button class="btn no" data-act="no">رفض</button>
+            </div>
+          </div></div>`
     };
     function bindSpray() {
       const cv = document.getElementById('cv'); if (!cv) return;
@@ -401,6 +412,18 @@
       renderNav();
       view.innerHTML = views[page]();
       if (page === 'spray') bindSpray();
+      const iconfile = document.getElementById('iconfile');
+      if (iconfile) iconfile.onchange = () => {
+        const file = iconfile.files && iconfile.files[0]; if (!file) return;
+        const r = new FileReader();
+        r.onload = () => {
+          const g = inspectGang || gangs[0];
+          g.iconImg = r.result;
+          render();
+          toast('الصورة انرفعت — تنتظر موافقة الإدارة');
+        };
+        r.readAsDataURL(file);
+      };
     }
     nav.addEventListener('click', e => {
       const b = e.target.closest('button[data-id]'); if (!b) return;
@@ -416,7 +439,10 @@
         else if (cv) sprayLog.unshift({ who: 'أنت', mode: 'draw', img: cv.toDataURL(), where: 'هنا', when: 'الآن' });
         page = 'logs'; render(); toast('انحفظ في السجل — الرسم أو الكتابة ظاهرة'); return;
       }
-      if (act === 'enter') { inspectGang = gangs[Number(b.getAttribute('data-i')||0)]; render(); return; }
+      if (act === 'uploadicon') {
+        const f = document.getElementById('iconfile'); if (f) f.click();
+        return;
+      }
       if (act === 'backg') { inspectGang = null; render(); return; }
       toast('تم (هذا عرض شكل — يشتغل كامل داخل اللعبة)');
     });
