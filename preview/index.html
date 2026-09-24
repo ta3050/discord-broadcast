@@ -95,45 +95,22 @@
     .swatch { width: 28px; height: 28px; border-radius: 8px; border: 0; cursor: pointer; }
     .gta-map {
       position: relative; height: 560px; border-radius: 16px; overflow: hidden;
-      border: 1px solid #2a151b;
-      background:
-        radial-gradient(circle at 18% 72%, rgba(40,90,70,.35), transparent 22%),
-        radial-gradient(circle at 78% 28%, rgba(70,60,40,.4), transparent 26%),
-        linear-gradient(#0b2a33, #082028 40%, #12301c 70%, #1a2a14);
+      border: 1px solid #2a151b; background: #0a2030;
     }
-    .gta-map::before {
-      content: ""; position: absolute; inset: 0;
-      background-image:
-        linear-gradient(rgba(255,255,255,.04) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(255,255,255,.04) 1px, transparent 1px);
-      background-size: 42px 42px; opacity: .35;
+    .gta-map img.atlas {
+      position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover;
     }
-    .land {
-      position: absolute; left: 8%; top: 10%; width: 84%; height: 80%;
-      background:
-        radial-gradient(ellipse at 50% 60%, #2a3a28 0%, #1a2818 42%, transparent 70%),
-        radial-gradient(ellipse at 30% 40%, #3a3428 0%, transparent 40%);
-      border-radius: 38% 42% 36% 40%;
-      box-shadow: inset 0 0 80px rgba(0,0,0,.45);
-    }
-    .road {
-      position: absolute; background: rgba(220,200,160,.14); transform: rotate(var(--r, 0deg));
-    }
-    .zone {
-      position: absolute; transform: translate(50%, -50%);
-      width: var(--s, 86px); height: var(--s, 86px); border-radius: 50%;
-      border: 2px solid var(--c); background: color-mix(in srgb, var(--c) 28%, transparent);
-      box-shadow: 0 0 18px color-mix(in srgb, var(--c) 45%, transparent);
+    .sq {
+      position: absolute; border: 2px solid var(--c, #c43b4a); border-radius: 2px;
+      background: color-mix(in srgb, var(--c, #c43b4a) 32%, transparent);
       cursor: pointer;
     }
-    .zone .dot {
-      position: absolute; left: 50%; top: 50%; width: 12px; height: 12px; margin: -6px;
-      border-radius: 50%; background: var(--c);
+    .sq.empty {
+      background: transparent; border: 1px dashed rgba(255,255,255,.28);
     }
-    .zone .lab {
-      position: absolute; top: 108%; left: 50%; transform: translateX(-50%);
-      white-space: nowrap; background: #12080ce6; border: 1px solid var(--line);
-      border-radius: 8px; padding: 4px 8px; font-size: 12px; font-weight: 800;
+    .sq .lab {
+      position: absolute; left: 4px; bottom: 4px; font-size: 11px; font-weight: 800;
+      background: #12080ce8; padding: 2px 6px; border-radius: 4px; white-space: nowrap;
     }
     .legend {
       position: absolute; left: 12px; bottom: 12px; background: #12080ccc;
@@ -190,14 +167,15 @@
       { name: 'محمد المطيري', role: 'نائب القائد', on: true, sprays: 2 }
     ];
     const zones = [
-      { name: 'قروف ستريت', owner: 'آل فخامة', c: '#e74c3c', x: '38%', y: '68%', s: '100px' },
-      { name: 'ديفيس', owner: 'بلوود', c: '#9b1c2c', x: '46%', y: '72%', s: '88px' },
-      { name: 'ستروبيري', owner: 'قولدن', c: '#e2b039', x: '42%', y: '58%', s: '80px' },
-      { name: 'فاينوود', owner: 'آل تشابو', c: '#e67e22', x: '48%', y: '38%', s: '92px' },
-      { name: 'ديل بيرو', owner: 'فاضي', c: '#8d9199', x: '22%', y: '48%', s: '86px' },
-      { name: 'ساندي شورز', owner: 'آل محترم', c: '#3498db', x: '70%', y: '32%', s: '110px' },
-      { name: 'باليتو باي', owner: 'فاضي', c: '#27ae60', x: '62%', y: '14%', s: '90px' },
-      { name: 'إل بورّو', owner: 'آل بارود', c: '#9b59b6', x: '64%', y: '70%', s: '84px' }
+      { name: 'المطار', owner: '', open: true, c: '#8d9199', l: '16%', t: '70%', w: '24%', h: '18%' },
+      { name: 'ديل بيرو', owner: '', open: true, c: '#8d9199', l: '6%', t: '36%', w: '14%', h: '12%' },
+      { name: 'قروف ستريت', owner: 'آل فخامة', open: true, c: '#e74c3c', l: '30%', t: '56%', w: '12%', h: '10%' },
+      { name: 'ديفيس', owner: 'بلوود', open: true, c: '#9b1c2c', l: '38%', t: '60%', w: '11%', h: '9%' },
+      { name: 'ستروبيري', owner: 'قولدن', open: true, c: '#e2b039', l: '34%', t: '46%', w: '11%', h: '9%' },
+      { name: 'وسط المدينة', owner: 'آل تشابو', open: true, c: '#e67e22', l: '42%', t: '40%', w: '13%', h: '11%' },
+      { name: 'فاينوود', owner: '', open: false, c: '#8d9199', l: '46%', t: '18%', w: '16%', h: '13%' },
+      { name: 'الميناء', owner: 'آل بارود', open: true, c: '#9b59b6', l: '52%', t: '66%', w: '16%', h: '12%' },
+      { name: 'ميرور بارك', owner: '', open: true, c: '#8d9199', l: '62%', t: '30%', w: '12%', h: '10%' }
     ];
     const pages = [
       ['home', 'عصابتي'],
@@ -253,20 +231,27 @@
         </tr>`).join('')}</tbody></table>`;
     }
     function mapView() {
+      const MAP = 'https://raw.githubusercontent.com/ta3050/discord-broadcast/cursor/wsmm-tablet-preview/preview/los-santos-map.png';
       return `<div class="gta-map">
-        <div class="land"></div>
-        <div class="road" style="left:18%;top:46%;width:62%;height:6px;--r:-8deg"></div>
-        <div class="road" style="left:40%;top:18%;width:6px;height:64%;--r:6deg"></div>
-        <div class="road" style="left:22%;top:62%;width:50%;height:5px;--r:12deg"></div>
-        ${zones.map(z => `<div class="zone" style="left:${z.x};top:${z.y};--c:${z.c};--s:${z.s}">
-          <span class="dot"></span>
-          <span class="lab">${z.name}<br><span class="tag">${z.owner}</span></span>
-        </div>`).join('')}
-        <div class="legend"><b>مناطق العصابات</b>
-          ${zones.map(z => `<div><i style="background:${z.c}"></i> ${z.name} — ${z.owner}</div>`).join('')}
-        </div>
+        <img class="atlas" alt="لوس سانتوس" src="${MAP}" />
+        ${zones.map((z,i) => {
+          if (!z.open && !z.owner) return '';
+          const empty = !z.owner;
+          return `<div class="sq ${empty?'empty':''}" data-act="zone" data-i="${i}" style="left:${z.l};top:${z.t};width:${z.w};height:${z.h};--c:${z.owner?z.c:'#ffffff'}">
+            ${empty ? '' : `<span class="lab">${z.name} · ${z.owner}</span>`}
+          </div>`;
+        }).join('')}
       </div>
-      <p class="hint">خريطة لوس سانتوس: كل دائرة تيرف عصابة. اللون = العصابة المسيطرة. الفاضي بدون سيطرة.</p>`;
+      <p class="hint">خريطة لوس سانتوس كاملة. المربعات = مناطق مستحَلّة. الفاضي نظيف بدون تلوين. الإدارة تفتح/تقفل الاستحواذ.</p>
+      <div class="card"><b>تحكم المناطق (إدارة)</b>
+        ${zones.map((z,i)=>`<div class="log" style="display:flex;justify-content:space-between;gap:8px;align-items:center">
+          <div><b>${z.name}</b> · ${z.owner || 'غير مستحَلّة'} · ${z.open?'مفتوحة':'مقفلة'}</div>
+          <div>
+            <button class="btn2" data-act="togglez" data-i="${i}">${z.open?'قفل':'فتح للاستحواذ'}</button>
+            <button class="manage" data-act="clearz" data-i="${i}">تفريغ</button>
+          </div>
+        </div>`).join('')}
+      </div>`;
     }
     let inspectGang = null;
     function leaderBody(g) {
