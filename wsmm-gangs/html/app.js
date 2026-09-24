@@ -184,7 +184,7 @@ function safeImg(src) {
 
 function colorHex(id) {
   const c = (S.colors || []).find((x) => x.id === id);
-  return c ? c.hex : '#c43b4a';
+  return c ? c.hex : '#3b7ac4';
 }
 
 function iconLabel(id) {
@@ -693,7 +693,7 @@ const views = {
 
 function render() {
   const g = S.gang;
-  document.getElementById('tablet').style.setProperty('--gang', g ? colorHex(g.color) : '#c43b4a');
+  document.getElementById('tablet').style.setProperty('--gang', g ? colorHex(g.color) : '#3b7ac4');
   $('page-title').textContent = pageTitle();
   $('btn-lang').textContent = t('lang');
   $('search').placeholder = t('search_member');
@@ -828,7 +828,7 @@ function showSummon(d) {
 
 const cv = $('cv');
 const ctx = cv.getContext('2d');
-let hex = '#c43b4a';
+let hex = '#3b7ac4';
 
 function clearCv() {
   ctx.fillStyle = '#0c0708';
@@ -885,7 +885,7 @@ window.addEventListener('message', (e) => {
   if (d.action === 'summon') showSummon(d.data);
   if (d.action === 'hideSummon') $('summon').hidden = true;
   if (d.action === 'openSpray') {
-    hex = (d.data && d.data.hex) || '#c43b4a';
+    hex = (d.data && d.data.hex) || '#3b7ac4';
     S.strings = (d.data && d.data.strings) || S.strings;
     $('mode-free').textContent = t('spray_free');
     $('mode-text').textContent = t('spray_text');

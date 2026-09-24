@@ -94,7 +94,7 @@ function WGRankLabel(rank, lang)
 end
 
 function WGHexToRgb(hex)
-    hex = (hex or '#e74c3c'):gsub('#', '')
+    hex = (hex or '#3b7ac4'):gsub('#', '')
     return tonumber(hex:sub(1, 2), 16) or 231, tonumber(hex:sub(3, 4), 16) or 76, tonumber(hex:sub(5, 6), 16) or 60
 end
 
