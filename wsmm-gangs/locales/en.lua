@@ -1,7 +1,8 @@
+-- WSMM GANGS. Copyright (c) 2026 WSMM GANGS.
 Locales = Locales or {}
 
 Locales['en'] = {
-    tablet_title = 'Gang Tablet',
+    tablet_title = 'WSMM GANGS',
     close = 'Close',
     home = 'Home',
     places = 'Places',

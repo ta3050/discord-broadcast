@@ -33,6 +33,7 @@ header {
   display: flex; justify-content: space-between; align-items: center;
   padding: 10px 12px; border-bottom: 3px solid var(--gang, #c0392b);
 }
+.brand { font-size: 11px; letter-spacing: 0.14em; color: #aaa; }
 #gang-name { font-size: 18px; font-weight: 700; }
 nav {
   display: flex; flex-wrap: wrap; gap: 6px;
@@ -61,6 +62,7 @@ canvas { width: 100%; background: #0c0c0c; border: 1px dashed #555; touch-action
   background: #1a1a1a; padding: 12px; border-radius: 10px;
   display: flex; gap: 16px; align-items: center; min-width: 320px;
 }
+footer { padding: 8px 12px; font-size: 11px; color: #777; letter-spacing: 0.12em; }
 @media (max-width: 900px) {
   #tablet { inset: 4vh 4vw; }
 }

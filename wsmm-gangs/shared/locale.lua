@@ -1,3 +1,4 @@
+-- WSMM GANGS. Copyright (c) 2026 WSMM GANGS.
 Locales = Locales or {}
 
 function _L(key, lang)

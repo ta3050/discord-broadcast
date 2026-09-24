@@ -1,6 +1,7 @@
+-- WSMM GANGS. Copyright (c) 2026 WSMM GANGS.
 function WGEnsureSchema()
     MySQL.query.await([[
-        CREATE TABLE IF NOT EXISTS wick_gangs (
+        CREATE TABLE IF NOT EXISTS wsmm_gangs (
             id INT AUTO_INCREMENT PRIMARY KEY,
             name VARCHAR(32) NOT NULL UNIQUE,
             label VARCHAR(64) NOT NULL,
@@ -18,7 +19,7 @@ function WGEnsureSchema()
         )
     ]])
     MySQL.query.await([[
-        CREATE TABLE IF NOT EXISTS wick_gang_members (
+        CREATE TABLE IF NOT EXISTS wsmm_gang_members (
             id INT AUTO_INCREMENT PRIMARY KEY,
             gang_id INT NOT NULL,
             identifier VARCHAR(80) NOT NULL UNIQUE,
@@ -31,7 +32,7 @@ function WGEnsureSchema()
         )
     ]])
     MySQL.query.await([[
-        CREATE TABLE IF NOT EXISTS wick_gang_sprays (
+        CREATE TABLE IF NOT EXISTS wsmm_gang_sprays (
             id INT AUTO_INCREMENT PRIMARY KEY,
             gang_id INT NOT NULL,
             identifier VARCHAR(80) NOT NULL,
@@ -49,7 +50,7 @@ function WGEnsureSchema()
         )
     ]])
     MySQL.query.await([[
-        CREATE TABLE IF NOT EXISTS wick_gang_notifications (
+        CREATE TABLE IF NOT EXISTS wsmm_gang_notifications (
             id INT AUTO_INCREMENT PRIMARY KEY,
             gang_id INT NOT NULL,
             type VARCHAR(24) NOT NULL DEFAULT 'info',
@@ -60,7 +61,7 @@ function WGEnsureSchema()
         )
     ]])
     MySQL.query.await([[
-        CREATE TABLE IF NOT EXISTS wick_gang_activity (
+        CREATE TABLE IF NOT EXISTS wsmm_gang_activity (
             id INT AUTO_INCREMENT PRIMARY KEY,
             gang_id INT NULL,
             actor VARCHAR(80) NOT NULL DEFAULT '',
@@ -72,7 +73,7 @@ function WGEnsureSchema()
         )
     ]])
     MySQL.query.await([[
-        CREATE TABLE IF NOT EXISTS wick_gang_zone_state (
+        CREATE TABLE IF NOT EXISTS wsmm_gang_zone_state (
             zone_id VARCHAR(32) PRIMARY KEY,
             owner_gang_id INT NULL,
             scores TEXT NULL

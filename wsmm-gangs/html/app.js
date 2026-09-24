@@ -1,3 +1,4 @@
+/* WSMM GANGS. Copyright (c) 2026 WSMM GANGS. */
 const MOCK = typeof GetParentResourceName !== 'function';
 let S = {};
 let page = 'home';
@@ -403,7 +404,7 @@ window.addEventListener('message', (e) => {
 
 if (MOCK) {
   const strings = {
-    tablet_title: 'تابلت العصابة', close: 'إغلاق', home: 'الرئيسية', places: 'الأماكن',
+    tablet_title: 'WSMM GANGS', close: 'إغلاق', home: 'الرئيسية', places: 'الأماكن',
     points: 'النقاط', rankings: 'الترتيب', members: 'الأعضاء', summon: 'استدعاء كامل',
     guest: 'ضيف',
     activity_log: 'سجل النشاط', no_activity: 'ما في نشاط.', clear_leader: 'إزالة القائد',

@@ -1,7 +1,9 @@
+-- WSMM GANGS. Copyright (c) 2026 WSMM GANGS.
+-- WSMM GANGS (resource: wsmm-gangs)
 -- Optional: run this if you do not want auto-create on resource start.
--- wick-gangs creates the same tables itself.
+-- wsmm-gangs creates the same tables itself.
 
-CREATE TABLE IF NOT EXISTS wick_gangs (
+CREATE TABLE IF NOT EXISTS wsmm_gangs (
     id INT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(32) NOT NULL UNIQUE,
     label VARCHAR(64) NOT NULL,
@@ -18,7 +20,7 @@ CREATE TABLE IF NOT EXISTS wick_gangs (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE IF NOT EXISTS wick_gang_members (
+CREATE TABLE IF NOT EXISTS wsmm_gang_members (
     id INT AUTO_INCREMENT PRIMARY KEY,
     gang_id INT NOT NULL,
     identifier VARCHAR(80) NOT NULL UNIQUE,
@@ -30,7 +32,7 @@ CREATE TABLE IF NOT EXISTS wick_gang_members (
     INDEX gang_idx (gang_id)
 );
 
-CREATE TABLE IF NOT EXISTS wick_gang_sprays (
+CREATE TABLE IF NOT EXISTS wsmm_gang_sprays (
     id INT AUTO_INCREMENT PRIMARY KEY,
     gang_id INT NOT NULL,
     identifier VARCHAR(80) NOT NULL,
@@ -47,7 +49,7 @@ CREATE TABLE IF NOT EXISTS wick_gang_sprays (
     INDEX gang_idx (gang_id)
 );
 
-CREATE TABLE IF NOT EXISTS wick_gang_notifications (
+CREATE TABLE IF NOT EXISTS wsmm_gang_notifications (
     id INT AUTO_INCREMENT PRIMARY KEY,
     gang_id INT NOT NULL,
     type VARCHAR(24) NOT NULL DEFAULT 'info',
@@ -57,7 +59,7 @@ CREATE TABLE IF NOT EXISTS wick_gang_notifications (
     INDEX gang_idx (gang_id)
 );
 
-CREATE TABLE IF NOT EXISTS wick_gang_activity (
+CREATE TABLE IF NOT EXISTS wsmm_gang_activity (
     id INT AUTO_INCREMENT PRIMARY KEY,
     gang_id INT NULL,
     actor VARCHAR(80) NOT NULL DEFAULT '',
@@ -68,7 +70,7 @@ CREATE TABLE IF NOT EXISTS wick_gang_activity (
     INDEX gang_idx (gang_id)
 );
 
-CREATE TABLE IF NOT EXISTS wick_gang_zone_state (
+CREATE TABLE IF NOT EXISTS wsmm_gang_zone_state (
     zone_id VARCHAR(32) PRIMARY KEY,
     owner_gang_id INT NULL,
     scores TEXT NULL

@@ -1,4 +1,8 @@
-# wick-gangs
+# WSMM GANGS
+
+FiveM resource folder: `wsmm-gangs`
+
+Copyright (c) 2026 **WSMM GANGS**. This resource belongs to WSMM GANGS. No other studio is credited.
 
 Lightweight **ESX** gang resource: tablet, full gang summon, rankings, map blips, leader/admin menus, and gang-only wall spray.
 
@@ -6,7 +10,7 @@ Standalone FiveM resource. **No Discord** — no webhooks, no bot, no off-tablet
 
 ## Install
 
-1. Copy `wick-gangs` into your server `resources` folder.
+1. Copy `wsmm-gangs` into your server `resources` folder.
 2. Items:
    - ESX: run `sql/items.sql`
    - ox_inventory: copy entries from `install/ox_inventory_items.lua`
@@ -14,9 +18,9 @@ Standalone FiveM resource. **No Discord** — no webhooks, no bot, no off-tablet
    ```
    ensure oxmysql
    ensure es_extended
-   ensure wick-gangs
+   ensure wsmm-gangs
    ```
-4. Admin (group `admin` / `superadmin` / ACE `wickgangs.admin`) opens the tablet with **F10** or `/gangadmin` and creates a gang, then assigns a leader.
+4. Admin (group `admin` / `superadmin` / ACE `wsmmgangs.admin`) opens the tablet with **F10** or `/gangadmin` and creates a gang, then assigns a leader.
 
 Tables are created automatically on start.
 
@@ -66,3 +70,8 @@ Map icon: leader picks from a list → **admin approve/reject**. Until approved,
 ## Locale
 
 Default Arabic (`Config.Locale = 'ar'`). Toggle EN/AR in the tablet.
+
+## Rights
+
+Copyright (c) 2026 WSMM GANGS. See `LICENSE` in this folder.
+

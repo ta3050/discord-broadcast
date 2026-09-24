@@ -1,3 +1,4 @@
+-- WSMM GANGS. Copyright (c) 2026 WSMM GANGS.
 local nearby = {}
 local sprayOpen = false
 local lastHit = nil
@@ -61,18 +62,18 @@ local function drawFreehand(s)
     end
 end
 
-RegisterNetEvent('wick_gangs:setSprays', function(list)
+RegisterNetEvent('wsmm_gangs:setSprays', function(list)
     nearby = list or {}
 end)
 
-RegisterNetEvent('wick_gangs:addSpray', function(s)
+RegisterNetEvent('wsmm_gangs:addSpray', function(s)
     if not s then return end
     local coords = GetEntityCoords(PlayerPedId())
     if #(coords - vector3(s.x, s.y, s.z)) > Config.Spray.syncRange then return end
     nearby[#nearby + 1] = s
 end)
 
-RegisterNetEvent('wick_gangs:removeSpray', function(id)
+RegisterNetEvent('wsmm_gangs:removeSpray', function(id)
     local out = {}
     for i = 1, #nearby do
         if nearby[i].id ~= id then out[#out + 1] = nearby[i] end
@@ -80,7 +81,7 @@ RegisterNetEvent('wick_gangs:removeSpray', function(id)
     nearby = out
 end)
 
-RegisterNetEvent('wick_gangs:clearSprays', function(gangId)
+RegisterNetEvent('wsmm_gangs:clearSprays', function(gangId)
     if not gangId or gangId == 0 then
         nearby = {}
         return
@@ -96,7 +97,7 @@ CreateThread(function()
     while true do
         Wait(Config.Spray.syncMs)
         local c = GetEntityCoords(PlayerPedId())
-        TriggerServerEvent('wick_gangs:requestSprays', c.x, c.y, c.z)
+        TriggerServerEvent('wsmm_gangs:requestSprays', c.x, c.y, c.z)
     end
 end)
 
@@ -119,15 +120,15 @@ CreateThread(function()
     end
 end)
 
-RegisterNetEvent('wick_gangs:trySpray', function()
-    TriggerServerEvent('wick_gangs:canSpray')
+RegisterNetEvent('wsmm_gangs:trySpray', function()
+    TriggerServerEvent('wsmm_gangs:canSpray')
 end)
 
-RegisterNetEvent('wick_gangs:sprayDenied', function(key)
+RegisterNetEvent('wsmm_gangs:sprayDenied', function(key)
     WGToast(_L(key))
 end)
 
-RegisterNetEvent('wick_gangs:sprayAllowed', function(info)
+RegisterNetEvent('wsmm_gangs:sprayAllowed', function(info)
     local hit, coords, normal = rayWall()
     if not hit then
         WGToast(_L('need_wall'))
@@ -158,7 +159,7 @@ RegisterNUICallback('spraySubmit', function(data, cb)
         cb({ ok = false })
         return
     end
-    TriggerServerEvent('wick_gangs:saveSpray', {
+    TriggerServerEvent('wsmm_gangs:saveSpray', {
         mode = data.mode,
         text = data.text,
         strokes = data.strokes,

@@ -1,3 +1,4 @@
+-- WSMM GANGS. Copyright (c) 2026 WSMM GANGS.
 local blips = {}
 local sprayBlips = {}
 
@@ -12,7 +13,7 @@ local function add(list, blip)
     return blip
 end
 
-RegisterNetEvent('wick_gangs:blips', function(payload)
+RegisterNetEvent('wsmm_gangs:blips', function(payload)
     payload = payload or {}
     wipe(blips)
     blips = {}
@@ -44,7 +45,7 @@ RegisterNetEvent('wick_gangs:blips', function(payload)
     end
 end)
 
-RegisterNetEvent('wick_gangs:sprayBlips', function(list)
+RegisterNetEvent('wsmm_gangs:sprayBlips', function(list)
     wipe(sprayBlips)
     sprayBlips = {}
     for _, s in ipairs(list or {}) do

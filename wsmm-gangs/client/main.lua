@@ -1,3 +1,4 @@
+-- WSMM GANGS. Copyright (c) 2026 WSMM GANGS.
 local ESX
 local lang = Config.Locale
 local tabletOpen = false
@@ -27,16 +28,16 @@ function WGToast(msg)
     EndTextCommandThefeedDisplayTicker(false, false)
 end
 
-RegisterNetEvent('wick_gangs:toast', function(msg)
+RegisterNetEvent('wsmm_gangs:toast', function(msg)
     WGToast(msg)
 end)
 
 local function openTablet()
     if tabletOpen then return end
-    TriggerServerEvent('wick_gangs:requestTablet', lang)
+    TriggerServerEvent('wsmm_gangs:requestTablet', lang)
 end
 
-RegisterNetEvent('wick_gangs:tabletData', function(data)
+RegisterNetEvent('wsmm_gangs:tabletData', function(data)
     if not data or not data.ok then
         WGToast(_L(data and data.reason or 'not_member', lang))
         return
@@ -46,7 +47,7 @@ RegisterNetEvent('wick_gangs:tabletData', function(data)
     nui('openTablet', data)
 end)
 
-RegisterNetEvent('wick_gangs:openTablet', function()
+RegisterNetEvent('wsmm_gangs:openTablet', function()
     openTablet()
 end)
 
@@ -64,12 +65,12 @@ end)
 
 RegisterNUICallback('action', function(data, cb)
     data = data or {}
-    TriggerServerEvent('wick_gangs:action', data.a, data)
+    TriggerServerEvent('wsmm_gangs:action', data.a, data)
     cb({ ok = true })
 end)
 
 RegisterNUICallback('refresh', function(_, cb)
-    TriggerServerEvent('wick_gangs:requestTablet', lang)
+    TriggerServerEvent('wsmm_gangs:requestTablet', lang)
     cb({ ok = true })
 end)
 
@@ -91,7 +92,7 @@ RegisterNUICallback('ignoreSummon', function(_, cb)
     cb({ ok = true })
 end)
 
-RegisterNetEvent('wick_gangs:summon', function(p)
+RegisterNetEvent('wsmm_gangs:summon', function(p)
     pendingSummon = p
     local blip = AddBlipForCoord(p.x, p.y, p.z)
     SetBlipSprite(blip, p.sprite or 161)
@@ -128,14 +129,14 @@ RegisterCommand('gangadmin', function()
 end, false)
 
 RegisterCommand('gangsummon', function()
-    TriggerServerEvent('wick_gangs:action', 'summon', {})
+    TriggerServerEvent('wsmm_gangs:action', 'summon', {})
 end, false)
 
-RegisterKeyMapping('gangtablet', 'Gang tablet', 'keyboard', Config.TabletKey)
-RegisterKeyMapping('gangleader', 'Gang leader menu', 'keyboard', Config.LeaderKey)
-RegisterKeyMapping('gangadmin', 'Gang admin menu', 'keyboard', Config.AdminKey)
+RegisterKeyMapping('gangtablet', 'WSMM GANGS tablet', 'keyboard', Config.TabletKey)
+RegisterKeyMapping('gangleader', 'WSMM GANGS leader menu', 'keyboard', Config.LeaderKey)
+RegisterKeyMapping('gangadmin', 'WSMM GANGS admin menu', 'keyboard', Config.AdminKey)
 
 CreateThread(function()
     Wait(1500)
-    TriggerServerEvent('wick_gangs:requestBlips')
+    TriggerServerEvent('wsmm_gangs:requestBlips')
 end)

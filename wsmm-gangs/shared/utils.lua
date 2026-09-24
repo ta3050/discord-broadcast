@@ -1,3 +1,4 @@
+-- WSMM GANGS. Copyright (c) 2026 WSMM GANGS.
 function WGLabel(field, lang)
     if type(field) == 'table' then
         lang = lang or Config.Locale or 'ar'

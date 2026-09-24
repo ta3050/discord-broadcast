@@ -1,3 +1,4 @@
+-- WSMM GANGS. Copyright (c) 2026 WSMM GANGS.
 local function hasItem(src, name)
     if GetResourceState('ox_inventory') == 'started' then
         return (exports.ox_inventory:GetItemCount(src, name) or 0) > 0
@@ -20,28 +21,28 @@ end
 local cooldown = {}
 
 function WG.DeleteSpray(id, gangId)
-    MySQL.update.await('DELETE FROM wick_gang_sprays WHERE id = ?', { id })
+    MySQL.update.await('DELETE FROM wsmm_gang_sprays WHERE id = ?', { id })
     if gangId then
-        MySQL.update.await('UPDATE wick_gangs SET spray_count = GREATEST(spray_count - 1, 0) WHERE id = ?', { gangId })
+        MySQL.update.await('UPDATE wsmm_gangs SET spray_count = GREATEST(spray_count - 1, 0) WHERE id = ?', { gangId })
         WG.Reload()
     end
-    TriggerClientEvent('wick_gangs:removeSpray', -1, id)
+    TriggerClientEvent('wsmm_gangs:removeSpray', -1, id)
     WG.RefreshBlipsAll()
 end
 
 function WG.WipeGangSprays(gangId)
-    MySQL.update.await('DELETE FROM wick_gang_sprays WHERE gang_id = ?', { gangId })
-    MySQL.update.await('UPDATE wick_gangs SET spray_count = 0 WHERE id = ?', { gangId })
+    MySQL.update.await('DELETE FROM wsmm_gang_sprays WHERE gang_id = ?', { gangId })
+    MySQL.update.await('UPDATE wsmm_gangs SET spray_count = 0 WHERE id = ?', { gangId })
     WG.Reload()
-    TriggerClientEvent('wick_gangs:clearSprays', -1, gangId)
+    TriggerClientEvent('wsmm_gangs:clearSprays', -1, gangId)
     WG.RefreshBlipsAll()
 end
 
 function WG.WipeAllSprays()
-    MySQL.update.await('DELETE FROM wick_gang_sprays')
-    MySQL.update.await('UPDATE wick_gangs SET spray_count = 0')
+    MySQL.update.await('DELETE FROM wsmm_gang_sprays')
+    MySQL.update.await('UPDATE wsmm_gangs SET spray_count = 0')
     WG.Reload()
-    TriggerClientEvent('wick_gangs:clearSprays', -1, 0)
+    TriggerClientEvent('wsmm_gangs:clearSprays', -1, 0)
     WG.RefreshBlipsAll()
 end
 
@@ -49,14 +50,14 @@ function WG.SendSprayBlips(src)
     local member, _ = WG.MemberOf(src)
     local admin = WG.IsAdmin(src)
     if not admin and not WG.IsLeader(member) then
-        TriggerClientEvent('wick_gangs:sprayBlips', src, {})
+        TriggerClientEvent('wsmm_gangs:sprayBlips', src, {})
         return
     end
     local rows
     if admin then
-        rows = MySQL.query.await('SELECT id, x, y, z, gang_id, mode FROM wick_gang_sprays ORDER BY id DESC LIMIT 40') or {}
+        rows = MySQL.query.await('SELECT id, x, y, z, gang_id, mode FROM wsmm_gang_sprays ORDER BY id DESC LIMIT 40') or {}
     else
-        rows = MySQL.query.await('SELECT id, x, y, z, gang_id, mode FROM wick_gang_sprays WHERE gang_id = ? ORDER BY id DESC LIMIT 20', { member.gang_id }) or {}
+        rows = MySQL.query.await('SELECT id, x, y, z, gang_id, mode FROM wsmm_gang_sprays WHERE gang_id = ? ORDER BY id DESC LIMIT 20', { member.gang_id }) or {}
     end
     local list = {}
     for _, r in ipairs(rows) do
@@ -64,15 +65,15 @@ function WG.SendSprayBlips(src)
         local col = g and WGColor(g.color) or WGColor('red')
         list[#list + 1] = { id = r.id, x = r.x, y = r.y, z = r.z, blipColor = col.blip, mode = r.mode }
     end
-    TriggerClientEvent('wick_gangs:sprayBlips', src, list)
+    TriggerClientEvent('wsmm_gangs:sprayBlips', src, list)
 end
 
-RegisterNetEvent('wick_gangs:requestSprays', function(x, y, z)
+RegisterNetEvent('wsmm_gangs:requestSprays', function(x, y, z)
     local src = source
     x, y, z = tonumber(x) or 0, tonumber(y) or 0, tonumber(z) or 0
     local range = Config.Spray.syncRange
     local rows = MySQL.query.await(
-        'SELECT id, gang_id, mode, text_content, strokes, x, y, z, heading FROM wick_gang_sprays WHERE (x - ?) * (x - ?) + (y - ?) * (y - ?) < ? ORDER BY id DESC LIMIT 24',
+        'SELECT id, gang_id, mode, text_content, strokes, x, y, z, heading FROM wsmm_gang_sprays WHERE (x - ?) * (x - ?) + (y - ?) * (y - ?) < ? ORDER BY id DESC LIMIT 24',
         { x, x, y, y, range * range }
     ) or {}
     local out = {}
@@ -94,10 +95,10 @@ RegisterNetEvent('wick_gangs:requestSprays', function(x, y, z)
             hex = col.hex
         }
     end
-    TriggerClientEvent('wick_gangs:setSprays', src, out)
+    TriggerClientEvent('wsmm_gangs:setSprays', src, out)
 end)
 
-RegisterNetEvent('wick_gangs:saveSpray', function(payload)
+RegisterNetEvent('wsmm_gangs:saveSpray', function(payload)
     local src = source
     payload = payload or {}
     local member, xP = WG.MemberOf(src)
@@ -158,7 +159,7 @@ RegisterNetEvent('wick_gangs:saveSpray', function(payload)
     cooldown[member.identifier] = now
 
     local id = MySQL.insert.await(
-        'INSERT INTO wick_gang_sprays (gang_id, identifier, player_name, mode, text_content, strokes, x, y, z, heading, zone_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        'INSERT INTO wsmm_gang_sprays (gang_id, identifier, player_name, mode, text_content, strokes, x, y, z, heading, zone_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
         {
             gang.id,
             member.identifier,
@@ -176,11 +177,11 @@ RegisterNetEvent('wick_gangs:saveSpray', function(payload)
         WG.AddInfluence(zoneId, gang.id, 6)
         local st = WG.ZoneState[zoneId]
         if st and st.owner_gang_id and st.owner_gang_id ~= gang.id then
-            MySQL.update.await('UPDATE wick_gangs SET points = GREATEST(points - 2, 0) WHERE id = ?', { st.owner_gang_id })
+            MySQL.update.await('UPDATE wsmm_gangs SET points = GREATEST(points - 2, 0) WHERE id = ?', { st.owner_gang_id })
             WG.NotifyLeaders(st.owner_gang_id, 'rival_spray')
         end
     end
-    MySQL.update.await('UPDATE wick_gangs SET points = points + ?, spray_count = spray_count + 1 WHERE id = ?', { pts, gang.id })
+    MySQL.update.await('UPDATE wsmm_gangs SET points = points + ?, spray_count = spray_count + 1 WHERE id = ?', { pts, gang.id })
     WG.Reload()
 
     local col = WGColor(gang.color)
@@ -194,18 +195,18 @@ RegisterNetEvent('wick_gangs:saveSpray', function(payload)
         hex = col.hex,
         gangId = gang.id
     }
-    TriggerClientEvent('wick_gangs:addSpray', -1, spray)
+    TriggerClientEvent('wsmm_gangs:addSpray', -1, spray)
     WG.Notify(src, 'spray_saved')
 end)
 
-RegisterNetEvent('wick_gangs:canSpray', function()
+RegisterNetEvent('wsmm_gangs:canSpray', function()
     local src = source
     local member = WG.MemberOf(src)
-    if not member then return TriggerClientEvent('wick_gangs:sprayDenied', src, 'no_spray') end
-    if member.is_guest == 1 then return TriggerClientEvent('wick_gangs:sprayDenied', src, 'guest_no_spray') end
-    if not hasItem(src, Config.SprayItem) then return TriggerClientEvent('wick_gangs:sprayDenied', src, 'no_item') end
+    if not member then return TriggerClientEvent('wsmm_gangs:sprayDenied', src, 'no_spray') end
+    if member.is_guest == 1 then return TriggerClientEvent('wsmm_gangs:sprayDenied', src, 'guest_no_spray') end
+    if not hasItem(src, Config.SprayItem) then return TriggerClientEvent('wsmm_gangs:sprayDenied', src, 'no_item') end
     local gang = WG.Gangs[member.gang_id]
-    TriggerClientEvent('wick_gangs:sprayAllowed', src, {
+    TriggerClientEvent('wsmm_gangs:sprayAllowed', src, {
         hex = WGColor(gang and gang.color or 'red').hex,
         maxText = Config.Spray.maxText
     })

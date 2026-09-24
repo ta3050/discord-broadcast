@@ -1,3 +1,4 @@
+-- WSMM GANGS. Copyright (c) 2026 WSMM GANGS.
 Config = {}
 
 Config.Locale = 'ar'

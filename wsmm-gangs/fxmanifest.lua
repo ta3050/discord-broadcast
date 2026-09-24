@@ -1,10 +1,11 @@
+-- WSMM GANGS. Copyright (c) 2026 WSMM GANGS.
 fx_version 'cerulean'
 game 'gta5'
 lua54 'yes'
 
-name 'wick-gangs'
-author 'Wick Studio'
-description 'Lightweight ESX gangs: tablet, full summon, rankings, blips, spray'
+name 'wsmm-gangs'
+author 'WSMM GANGS'
+description 'WSMM GANGS — ESX tablet, full summon, rankings, blips, spray'
 version '1.0.0'
 
 ui_page 'html/index.html'
