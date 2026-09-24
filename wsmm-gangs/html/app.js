@@ -222,7 +222,7 @@ function mapBox(z) {
 
 function mapView() {
   const zones = S.places || [];
-  const claimed = zones.filter((z) => z.open !== false && z.claimed && z.owner);
+  const claimed = zones.filter((z) => z.open !== false && z.claimed && z.owner && mapBox(z));
   const boxes = zones.map((z) => {
     if (z.open === false) return '';
     const p = mapBox(z);
@@ -781,6 +781,10 @@ if (MOCK) {
     spray_hint: 'وضعين: رسم حر أو كتابة. بدون رفع صور. الكلام الوسخ ينحجب.',
     spray_wall_hint: 'البخ الحقيقي على الجدار بعلبة البخاخ. هالصفحة للتجربة داخل التابلت.',
     logs_only: 'السجلات لليدر والإدارة فقط.', request_icon: 'طلب الأيقونة',
+    icon_upload_hint: 'ارفع صورة الأيقونة (PNG/JPEG). ما تظهر إلا بعد موافقة الأدمن.',
+    upload_icon: 'رفع أيقونة', icon_blip_note: 'الأيقونة تظهر على الخريطة بعد الموافقة.',
+    icon_preview: 'معاينة', icon_pending: 'بانتظار موافقة الأدمن',
+    icon_image_pending: 'صورة مرفوعة', icon_bad_type: 'نوع الصورة غلط', icon_too_big: 'الصورة أكبر من المسموح',
     guest_no_spray: 'الضيف ما يقدر يبخ.', not_leader: 'هالخيار للقائد فقط.', not_admin: 'هالخيار للأدمن فقط.',
     no_notifs: 'ما في تنويهات.', all_sprays: 'كل البخاخات',
     activity_log: 'سجل النشاط', no_activity: 'ما في نشاط.', clear_leader: 'إزالة القائد',
