@@ -152,6 +152,7 @@ Locales['ar'] = {
     zone_created = 'انشئت المنطقة.',
     zone_deleted = 'انحذفت المنطقة.',
     zone_limit = 'وصلت حد المناطق المخصصة.',
+    zone_custom = 'مخصصة',
     delete_zone = 'حذف المنطقة',
     zone_open = 'فتح',
     zone_lock = 'قفل',

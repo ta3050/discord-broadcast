@@ -152,6 +152,7 @@ Locales['en'] = {
     zone_created = 'Zone created.',
     zone_deleted = 'Zone deleted.',
     zone_limit = 'Custom zone limit reached.',
+    zone_custom = 'Custom',
     delete_zone = 'Delete zone',
     zone_open = 'Open',
     zone_lock = 'Lock',

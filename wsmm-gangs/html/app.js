@@ -291,7 +291,7 @@ function zoneAdmin() {
       </div>` : ''}
     ${zones.map((z) => `<div class="log">
       <b>${esc(z.label)}</b>
-      <span class="xp">${z.open === false ? t('zone_locked_state') : t('zone_open_state')}${z.owner ? ' · ' + esc(z.owner) : ''}${z.custom ? ' · ' + t('create_zone') : ''}</span>
+      <span class="xp">${z.open === false ? t('zone_locked_state') : t('zone_open_state')}${z.owner ? ' · ' + esc(z.owner) : ''}${z.custom ? ' · ' + t('zone_custom') : ''}</span>
       ${z.open === false
         ? `<button class="btn ok" data-act='{"a":"setZoneOpen","zoneId":"${esc(z.id)}","open":1}'>${t('zone_open')}</button>`
         : `<button class="btn2" data-act='{"a":"setZoneOpen","zoneId":"${esc(z.id)}","open":0}'>${t('zone_lock')}</button>`}
@@ -920,6 +920,7 @@ if (MOCK) {
     zone_created: 'انشئت المنطقة.',
     zone_deleted: 'انحذفت المنطقة.',
     zone_limit: 'وصلت حد المناطق المخصصة.',
+    zone_custom: 'مخصصة',
     delete_zone: 'حذف المنطقة',
     zone_open: 'فتح', zone_lock: 'قفل',
     zone_open_state: 'مفتوحة للمطالبة', zone_locked_state: 'مقفلة',
