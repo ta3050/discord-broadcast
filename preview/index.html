@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>WSMM GANGS</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #070405;
+      --panel: #12080c;
+      --card: #1a0d12;
+      --line: #3a1a22;
+      --red: #9a2b38;
+      --red-hot: #c43b4a;
+      --gold: #e2b039;
+      --gold-2: #f0c85a;
+      --silver: #8d9199;
+      --muted: #9a858b;
+      --text: #f4ecee;
+      --online: #3dcf7a;
+      --gang: #c43b4a;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      min-height: 100vh;
+      background: radial-gradient(1200px 700px at 80% -10%, #3a1018 0%, transparent 50%), var(--bg);
+      color: var(--text);
+      font-family: Cairo, Tahoma, sans-serif;
+    }
+    .shell {
+      width: min(1280px, 96vw);
+      height: min(760px, 94vh);
+      margin: 3vh auto;
+      display: grid;
+      grid-template-columns: 1fr 228px;
+      background: linear-gradient(180deg, #16090d, var(--panel));
+      border: 1px solid var(--line);
+      border-radius: 22px;
+      overflow: hidden;
+      box-shadow: 0 30px 80px rgba(0,0,0,.55);
+    }
+    .main { display: flex; flex-direction: column; min-width: 0; }
+    .top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 18px 24px 8px;
+    }
+    .brand { display: flex; align-items: center; gap: 10px; font-weight: 800; font-size: 22px; }
+    .skull {
+      width: 34px; height: 34px; border-radius: 10px;
+      background: var(--red); display: grid; place-items: center; font-size: 18px;
+    }
+    .page-title { color: var(--muted); font-weight: 700; }
+    .side {
+      background: #0c0608;
+      border-right: 1px solid var(--line);
+      padding: 18px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .nav {
+      width: 100%;
+      border: 0;
+      background: transparent;
+      color: #d7c4c8;
+      display: flex;
+      align-items: center;
+      justify-content: flex-start;
+      gap: 10px;
+      padding: 11px 12px;
+      border-radius: 10px;
+      cursor: pointer;
+      font: inherit;
+      font-weight: 700;
+    }
+    .nav.active { background: var(--red); color: #fff; }
+    .nav:hover:not(.active) { background: #1c0d12; }
+    .content { padding: 8px 24px 24px; overflow: auto; }
+    .podium {
+      display: grid;
+      grid-template-columns: 1fr 1.15fr 1fr;
+      gap: 18px;
+      align-items: end;
+      margin: 18px auto 28px;
+      max-width: 720px;
+    }
+    .spot { text-align: center; }
+    .avatar {
+      width: 78px; height: 78px; margin: 0 auto 8px; border-radius: 18px;
+      background: #2a141a; border: 2px solid var(--line);
+      display: grid; place-items: center; font-size: 28px; overflow: hidden;
+    }
+    .spot.gold .avatar { width: 96px; height: 96px; border-color: var(--gold); box-shadow: 0 0 24px rgba(226,176,57,.35); }
+    .name { font-weight: 800; }
+    .tag { color: var(--gold); font-size: 13px; }
+    .xp { color: var(--muted); font-size: 13px; margin-top: 4px; }
+    .plinth {
+      margin-top: 12px; padding: 14px 8px; border-radius: 12px 12px 4px 4px; font-weight: 800;
+    }
+    .gold .plinth { background: linear-gradient(#f0c85a, #c9921c); color: #2a1a00; }
+    .silver .plinth { background: linear-gradient(#cfd3da, #7c818a); color: #1b1d22; }
+    .bronze .plinth { background: linear-gradient(#e0a24a, #9a6416); color: #2a1700; }
+    .list { display: flex; flex-direction: column; gap: 8px; }
+    .row {
+      display: grid;
+      grid-template-columns: 52px 1fr auto;
+      align-items: center;
+      background: #14090d;
+      border: 1px solid #2a151b;
+      border-radius: 10px;
+      padding: 10px 14px;
+    }
+    .rank-num {
+      width: 28px; height: 28px; border-radius: 8px;
+      background: #3a1820; display: grid; place-items: center; font-weight: 800; color: #ffd9df;
+    }
+    .search {
+      width: 260px;
+      background: #14090d;
+      border: 1px solid var(--line);
+      color: #fff;
+      border-radius: 10px;
+      padding: 8px 12px;
+      font: inherit;
+    }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { padding: 12px 10px; text-align: right; }
+    th { color: var(--muted); font-size: 13px; font-weight: 700; }
+    tr { border-bottom: 1px solid #241015; }
+    .pill {
+      display: inline-block; padding: 3px 10px; border-radius: 8px;
+      background: #3a1820; color: #ffd0d6; font-size: 12px; font-weight: 700;
+    }
+    .on { color: var(--online); font-weight: 700; }
+    .off { color: #8a7378; }
+    .manage {
+      background: var(--red); color: #fff; border: 0; border-radius: 8px;
+      padding: 6px 10px; cursor: pointer; font: inherit; font-weight: 700;
+    }
+    .cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 18px; }
+    .card {
+      background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 16px;
+    }
+    .card b { display: block; font-size: 26px; color: var(--gold); }
+    .btn {
+      background: var(--red-hot); color: #fff; border: 0; border-radius: 12px;
+      padding: 12px 16px; font: inherit; font-weight: 800; cursor: pointer;
+    }
+    .zones { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+    .zone { background: #14090d; border: 1px solid var(--line); border-radius: 12px; padding: 14px; }
+    .hidden { display: none !important; }
+    .log { background: #14090d; border: 1px solid var(--line); border-radius: 12px; padding: 12px; margin-bottom: 8px; }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <section class="main">
+      <header class="top">
+        <div class="brand"><span class="skull">☠</span> WSMM GANGS</div>
+        <div class="page-title" id="title">عصابتي</div>
+        <input class="search hidden" id="search" placeholder="البحث عن عضو.." />
+      </header>
+      <div class="content" id="view"></div>
+    </section>
+    <aside class="side" id="nav"></aside>
+  </div>
+  <script>
+    const gangs = [
+      { name: 'آل فخامة', tag: 'DARK', xp: 35135, sprays: 12, place: 1 },
+      { name: 'بلوود', tag: 'BLOOD', xp: 33645, sprays: 12, place: 2 },
+      { name: 'قولدن', tag: 'GOLDEN', xp: 32087, sprays: 11, place: 3 },
+      { name: 'آل تشابو', tag: 'CHAPO', xp: 25534, sprays: 10, place: 4 },
+      { name: 'آل محترم', tag: 'M7TRM', xp: 2500, sprays: 3, place: 5 },
+      { name: 'آل بارود', tag: '90s', xp: 150, sprays: 1, place: 6 }
+    ];
+    const members = [
+      { name: 'محمد بن نايف', role: 'عضو', on: true, sprays: 4 },
+      { name: 'أنس الزهراني', role: 'عضو', on: true, sprays: 1 },
+      { name: 'قولدن تصوير', role: 'قائد', on: true, sprays: 9 },
+      { name: 'طارق بن عبدالله', role: 'عضو', on: true, sprays: 0 },
+      { name: 'محمد المطيري', role: 'نائب القائد', on: true, sprays: 2 }
+    ];
+    const pages = [
+      ['home', 'عصابتي'],
+      ['members', 'أعضاء العصابة'],
+      ['guest', 'الدعوات'],
+      ['rankings', 'ترتيب العصابات'],
+      ['map', 'الخريطة'],
+      ['summon', 'استدعاء كامل'],
+      ['logs', 'السجلات']
+    ];
+    let page = 'rankings';
+    const nav = document.getElementById('nav');
+    const view = document.getElementById('view');
+    const title = document.getElementById('title');
+    const search = document.getElementById('search');
+
+    function renderNav() {
+      nav.innerHTML = pages.map(([id, label]) =>
+        `<button class="nav ${page===id?'active':''}" data-id="${id}">${label}</button>`
+      ).join('');
+    }
+    function podium() {
+      const [a,b,c,...rest] = gangs;
+      return `
+        <div class="podium">
+          <div class="spot bronze"><div class="avatar">🎖</div><div class="name">${c.name}</div><div class="tag">[${c.tag}]</div><div class="xp">خبرة ${c.xp} · ${c.sprays} بخة</div><div class="plinth">الثالث</div></div>
+          <div class="spot gold"><div class="avatar">🏆</div><div class="name">${a.name}</div><div class="tag">[${a.tag}]</div><div class="xp">خبرة ${a.xp} · ${a.sprays} بخة</div><div class="plinth">الأول</div></div>
+          <div class="spot silver"><div class="avatar">🥈</div><div class="name">${b.name}</div><div class="tag">[${b.tag}]</div><div class="xp">خبرة ${b.xp} · ${b.sprays} بخة</div><div class="plinth">الثاني</div></div>
+        </div>
+        <div class="list">${rest.map(g => `
+          <div class="row"><span class="rank-num">${g.place}</span><div><b>${g.name}</b> <span class="tag">[${g.tag}]</span></div><span class="xp">خبرة ${g.xp} · ${g.sprays} بخة</span></div>
+        `).join('')}</div>`;
+    }
+    function membersView() {
+      const q = (search.value || '').trim();
+      const rows = members.filter(m => m.name.includes(q));
+      return `<table>
+        <thead><tr><th></th><th>الحالة</th><th>الاسم</th><th>الدور</th><th>البخات</th><th></th></tr></thead>
+        <tbody>${rows.map(m => `<tr>
+          <td><button class="manage">إدارة</button></td>
+          <td class="${m.on?'on':'off'}">${m.on?'● متصل':'○ غير متصل'}</td>
+          <td><b>${m.name}</b></td>
+          <td><span class="pill">${m.role}</span></td>
+          <td>${m.sprays}</td>
+          <td></td>
+        </tr>`).join('')}</tbody></table>`;
+    }
+    const views = {
+      home: () => `<div class="cards">
+          <div class="card">النقاط<b>35135</b></div>
+          <div class="card">البخات<b>12</b></div>
+          <div class="card">الترتيب<b>#1</b></div>
+        </div>
+        <div class="card">عصابة <b style="font-size:20px;color:#fff">آل فخامة · DARK</b><p style="color:var(--muted);margin-top:8px">اللون أحمر · الأيقونة بانتظار موافقة الإدارة</p></div>`,
+      members: membersView,
+      guest: () => `<div class="card"><p>دعوة ضيف مؤقت بكود أو آيدي السيرفر.</p><br/><input class="search" id="gid" placeholder="آيدي اللاعب" /> <button class="btn" style="margin-right:8px">دعوة</button></div>`,
+      rankings: podium,
+      map: () => `<div class="zones">
+        ${['قروف ستريت','ديفيس','ساندي شورز','باليتو باي'].map((z,i)=>`<div class="zone"><b>${z}</b><div class="xp">${i===0?'المسيطر: آل فخامة':'فاضي'}</div></div>`).join('')}
+      </div>`,
+      summon: () => `<div class="card"><p>استدعاء كامل لكل أعضاء العصابة الأونلاين مع علامة على الخريطة وGPS.</p><br/><button class="btn">استدعاء العصابة كلها</button></div>`,
+      logs: () => `<div class="log"><b>سجل البخ</b><div class="xp">حمود · نص · قروف ستريت · الآن</div></div>
+        <div class="log"><b>سجل النشاط</b><div class="xp">أدمن عيّن قائد · حمود</div></div>
+        <p class="xp">السجلات لليدر والإدارة فقط.</p>`
+    };
+    function render() {
+      title.textContent = pages.find(p => p[0]===page)[1];
+      search.classList.toggle('hidden', page !== 'members');
+      renderNav();
+      view.innerHTML = views[page]();
+    }
+    nav.addEventListener('click', e => {
+      const b = e.target.closest('button[data-id]');
+      if (!b) return;
+      page = b.dataset.id;
+      render();
+    });
+    search.addEventListener('input', () => { if (page==='members') view.innerHTML = membersView(); });
+    render();
+  </script>
+</body>
+</html>
