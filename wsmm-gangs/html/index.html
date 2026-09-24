@@ -1,13 +1,15 @@
 <!-- WSMM GANGS. Copyright (c) 2026 WSMM GANGS. -->
-<!doctype html>
-<html lang="ar">
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
 <head>
-  <meta charset="utf-8"/>
+  <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <link rel="stylesheet" href="style.css"/>
   <title>WSMM GANGS</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@500;600;700;800&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="style.css"/>
 </head>
-<body>
+<body class="rtl">
   <div id="toast" hidden></div>
 
   <div id="summon" class="banner" hidden>
@@ -16,38 +18,40 @@
       <div id="summon-sub"></div>
     </div>
     <div class="row">
-      <button id="summon-ok" class="ok"></button>
+      <button id="summon-ok" class="btn"></button>
       <button id="summon-no"></button>
     </div>
   </div>
 
-  <div id="tablet" hidden>
-    <header>
-      <div>
-        <div class="brand">WSMM GANGS</div>
-        <div id="gang-name">—</div>
-        <small id="gang-meta"></small>
-      </div>
-      <div class="row">
-        <button id="btn-lang"></button>
-        <button id="btn-close">✕</button>
-      </div>
-    </header>
-    <nav id="nav"></nav>
-    <main id="page"></main>
-    <footer>WSMM GANGS</footer>
+  <div id="tablet" class="shell" hidden>
+    <section class="main">
+      <header class="top">
+        <div class="brand"><span class="skull">☠</span> WSMM GANGS</div>
+        <div class="page-title" id="page-title"></div>
+        <div class="top-tools">
+          <input class="search hidden" id="search" placeholder=""/>
+          <button id="btn-lang" class="ghost"></button>
+          <button id="btn-close" class="ghost">✕</button>
+        </div>
+      </header>
+      <div class="content" id="page"></div>
+    </section>
+    <aside class="side">
+      <nav id="nav"></nav>
+    </aside>
   </div>
 
   <div id="spray" hidden>
     <div class="spray-box">
+      <div class="brand"><span class="skull">☠</span> WSMM GANGS</div>
       <div class="row">
-        <button id="mode-free" class="ok"></button>
+        <button id="mode-free" class="btn"></button>
         <button id="mode-text"></button>
       </div>
       <canvas id="cv" width="420" height="260"></canvas>
       <input id="spray-text" maxlength="28" hidden/>
       <div class="row">
-        <button id="spray-ok" class="ok"></button>
+        <button id="spray-ok" class="btn"></button>
         <button id="spray-cancel"></button>
       </div>
     </div>

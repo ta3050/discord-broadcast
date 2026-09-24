@@ -211,6 +211,14 @@ function WG.Places(lang)
 end
 
 local function gangMembers(gangId, lang)
+    local counts = {}
+    local rows = MySQL.query.await(
+        'SELECT identifier, COUNT(*) AS n FROM wsmm_gang_sprays WHERE gang_id = ? GROUP BY identifier',
+        { gangId }
+    ) or {}
+    for _, r in ipairs(rows) do
+        counts[r.identifier] = tonumber(r.n) or 0
+    end
     local list = {}
     for ident, m in pairs(WG.Members) do
         if m.gang_id == gangId then
@@ -220,7 +228,8 @@ local function gangMembers(gangId, lang)
                 rank = m.rank,
                 rankLabel = WGRankLabel(m.rank, lang),
                 guest = m.is_guest == 1,
-                online = WG.Online[ident] ~= nil
+                online = WG.Online[ident] ~= nil,
+                sprays = counts[ident] or 0
             }
         end
     end
