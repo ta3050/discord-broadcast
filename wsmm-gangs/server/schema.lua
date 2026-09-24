@@ -9,6 +9,8 @@ function WGEnsureSchema()
             color VARCHAR(16) NOT NULL DEFAULT 'red',
             icon VARCHAR(16) NOT NULL DEFAULT 'gang',
             pending_icon VARCHAR(16) NULL,
+            icon_image MEDIUMTEXT NULL,
+            pending_icon_image MEDIUMTEXT NULL,
             points INT NOT NULL DEFAULT 0,
             spray_count INT NOT NULL DEFAULT 0,
             leader VARCHAR(80) NULL,
@@ -76,7 +78,17 @@ function WGEnsureSchema()
         CREATE TABLE IF NOT EXISTS wsmm_gang_zone_state (
             zone_id VARCHAR(32) PRIMARY KEY,
             owner_gang_id INT NULL,
-            scores TEXT NULL
+            scores TEXT NULL,
+            open TINYINT NOT NULL DEFAULT 1
         )
     ]])
+    pcall(function()
+        MySQL.query.await('ALTER TABLE wsmm_gangs ADD COLUMN icon_image MEDIUMTEXT NULL')
+    end)
+    pcall(function()
+        MySQL.query.await('ALTER TABLE wsmm_gangs ADD COLUMN pending_icon_image MEDIUMTEXT NULL')
+    end)
+    pcall(function()
+        MySQL.query.await('ALTER TABLE wsmm_gang_zone_state ADD COLUMN open TINYINT NOT NULL DEFAULT 1')
+    end)
 end

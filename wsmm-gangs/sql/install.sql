@@ -11,6 +11,8 @@ CREATE TABLE IF NOT EXISTS wsmm_gangs (
     color VARCHAR(16) NOT NULL DEFAULT 'red',
     icon VARCHAR(16) NOT NULL DEFAULT 'gang',
     pending_icon VARCHAR(16) NULL,
+    icon_image MEDIUMTEXT NULL,
+    pending_icon_image MEDIUMTEXT NULL,
     points INT NOT NULL DEFAULT 0,
     spray_count INT NOT NULL DEFAULT 0,
     leader VARCHAR(80) NULL,
@@ -73,5 +75,6 @@ CREATE TABLE IF NOT EXISTS wsmm_gang_activity (
 CREATE TABLE IF NOT EXISTS wsmm_gang_zone_state (
     zone_id VARCHAR(32) PRIMARY KEY,
     owner_gang_id INT NULL,
-    scores TEXT NULL
+    scores TEXT NULL,
+    open TINYINT NOT NULL DEFAULT 1
 );

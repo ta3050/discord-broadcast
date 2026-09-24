@@ -172,7 +172,7 @@ RegisterNetEvent('wsmm_gangs:saveSpray', function(payload)
     )
 
     local pts = Config.Spray.pointsPerSpray
-    if zoneId then
+    if zoneId and WG.ZoneIsOpen(zoneId) then
         pts = pts + Config.Spray.zoneBonus
         WG.AddInfluence(zoneId, gang.id, 6)
         local st = WG.ZoneState[zoneId]

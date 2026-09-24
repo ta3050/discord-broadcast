@@ -60,6 +60,46 @@ function WG.IsLeader(member)
     return g and g.leader == member.identifier
 end
 
+local function hasPendingIcon(g)
+    if not g then return false end
+    return (g.pending_icon and g.pending_icon ~= '')
+        or (g.pending_icon_image and g.pending_icon_image ~= '')
+end
+
+-- Leader of the gang, or admin acting on a gang they entered / selected.
+local function iconEditGang(member, admin, data)
+    local gid = tonumber(data and data.gangId)
+    if admin and gid and WG.Gangs[gid] then
+        return WG.Gangs[gid]
+    end
+    if WG.IsLeader(member) and member then
+        return WG.Gangs[member.gang_id]
+    end
+    if admin and member and WG.Gangs[member.gang_id] then
+        return WG.Gangs[member.gang_id]
+    end
+    return nil
+end
+
+function WG.SavePendingIcon(src, data)
+    local member = select(1, WG.MemberOf(src))
+    local admin = WG.IsAdmin(src)
+    local g = iconEditGang(member, admin, data)
+    if not g then
+        WG.Notify(src, admin and 'not_admin' or 'not_leader')
+        return
+    end
+    local url = WGSanitizeIconDataUrl(data and (data.image or data.dataUrl))
+    if not url then
+        WG.Notify(src, 'icon_bad_type')
+        return
+    end
+    MySQL.update.await('UPDATE wsmm_gangs SET pending_icon_image = ? WHERE id = ?', { url, g.id })
+    WG.Reload()
+    WG.Notify(src, 'icon_pending')
+    WG.LogActivity(src, g.id, 'icon_request', 'image')
+end
+
 function WG.Notify(src, key)
     TriggerClientEvent('wsmm_gangs:toast', src, _L(key))
 end
@@ -83,7 +123,7 @@ end
 function WG.LoadZones()
     WG.ZoneState = {}
     for _, z in ipairs(Config.Zones) do
-        WG.ZoneState[z.id] = { owner_gang_id = nil, scores = {} }
+        WG.ZoneState[z.id] = { owner_gang_id = nil, scores = {}, open = 1 }
     end
     for _, r in ipairs(MySQL.query.await('SELECT * FROM wsmm_gang_zone_state') or {}) do
         local scores = {}
@@ -91,22 +131,32 @@ function WG.LoadZones()
             local ok, decoded = pcall(json.decode, r.scores)
             if ok and type(decoded) == 'table' then scores = decoded end
         end
-        WG.ZoneState[r.zone_id] = { owner_gang_id = r.owner_gang_id, scores = scores }
+        local open = 1
+        if r.open == 0 or r.open == false then open = 0 end
+        if WG.ZoneState[r.zone_id] then
+            WG.ZoneState[r.zone_id] = { owner_gang_id = r.owner_gang_id, scores = scores, open = open }
+        end
     end
 end
 
 function WG.SaveZone(zoneId)
     local st = WG.ZoneState[zoneId]
     if not st then return end
+    local open = (st.open == 0) and 0 or 1
     MySQL.query.await(
-        'INSERT INTO wsmm_gang_zone_state (zone_id, owner_gang_id, scores) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE owner_gang_id = VALUES(owner_gang_id), scores = VALUES(scores)',
-        { zoneId, st.owner_gang_id, json.encode(st.scores or {}) }
+        'INSERT INTO wsmm_gang_zone_state (zone_id, owner_gang_id, scores, open) VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE owner_gang_id = VALUES(owner_gang_id), scores = VALUES(scores), open = VALUES(open)',
+        { zoneId, st.owner_gang_id, json.encode(st.scores or {}), open }
     )
+end
+
+function WG.ZoneIsOpen(zoneId)
+    local st = zoneId and WG.ZoneState[zoneId]
+    return st and st.open ~= 0
 end
 
 function WG.AddInfluence(zoneId, gangId, amount)
     local st = WG.ZoneState[zoneId]
-    if not st then return end
+    if not st or st.open == 0 then return end
     local key = tostring(gangId)
     st.scores[key] = (st.scores[key] or 0) + amount
     local bestId, best = nil, 0
@@ -193,6 +243,7 @@ function WG.Rankings()
             tag = g.tag,
             color = g.color,
             icon = g.icon,
+            iconImage = g.icon_image,
             points = g.points or 0,
             sprays = g.spray_count or 0,
             zones = zones,
@@ -207,7 +258,8 @@ function WG.Places(lang)
     local out = {}
     for i = 1, #Config.Zones do
         local z = Config.Zones[i]
-        local st = WG.ZoneState[z.id] or {}
+        local st = WG.ZoneState[z.id] or { open = 1 }
+        local open = st.open ~= 0
         local owner = st.owner_gang_id and WG.Gangs[st.owner_gang_id]
         local col = owner and WGColor(owner.color) or nil
         out[#out + 1] = {
@@ -215,11 +267,15 @@ function WG.Places(lang)
             label = WGLabel(z.label, lang),
             owner = owner and owner.label or nil,
             color = owner and owner.color or nil,
-            hex = col and col.hex or '#8d9199',
+            hex = col and col.hex or nil,
             icon = owner and owner.icon or nil,
+            iconImage = owner and owner.icon_image or nil,
             x = z.coords.x,
             y = z.coords.y,
-            radius = z.radius,
+            size = WGZoneHalf(z),
+            map = z.map,
+            open = open,
+            claimed = owner ~= nil,
             influence = st.scores or {}
         }
     end
@@ -261,18 +317,21 @@ local function publicBlips()
     for i = 1, #Config.Zones do
         local z = Config.Zones[i]
         local st = WG.ZoneState[z.id] or {}
-        local owner = st.owner_gang_id and WG.Gangs[st.owner_gang_id]
-        if owner then
-            local col = WGColor(owner.color)
-            local ic = WGIcon(owner.icon)
-            turfs[#turfs + 1] = {
-                x = z.coords.x, y = z.coords.y, z = z.coords.z,
-                radius = z.radius,
-                label = owner.label .. ' · ' .. WGLabel(z.label, Config.Locale),
-                blipColor = col.blip,
-                sprite = ic.sprite,
-                hex = col.hex
-            }
+        if st.open ~= 0 then
+            local owner = st.owner_gang_id and WG.Gangs[st.owner_gang_id]
+            if owner then
+                local col = WGColor(owner.color)
+                local ic = WGIcon(owner.icon)
+                local half = WGZoneHalf(z)
+                turfs[#turfs + 1] = {
+                    x = z.coords.x, y = z.coords.y, z = z.coords.z,
+                    size = half,
+                    label = owner.label .. ' · ' .. WGLabel(z.label, Config.Locale),
+                    blipColor = col.blip,
+                    sprite = ic.sprite,
+                    hex = col.hex
+                }
+            end
         end
     end
     return turfs
@@ -365,7 +424,9 @@ function WG.BuildTablet(src, lang)
             color = gang.color,
             hex = col.hex,
             icon = gang.icon,
+            iconImage = gang.icon_image,
             pendingIcon = (isLeader or admin) and gang.pending_icon or nil,
+            pendingIconImage = (isLeader or admin) and gang.pending_icon_image or nil,
             points = gang.points,
             sprays = gang.spray_count
         }
@@ -398,11 +459,14 @@ function WG.BuildTablet(src, lang)
             payload.gangs[#payload.gangs + 1] = {
                 id = g.id, name = g.name, label = g.label, tag = g.tag,
                 color = g.color, icon = g.icon, pendingIcon = g.pending_icon,
+                iconImage = g.icon_image, pendingIconImage = g.pending_icon_image,
                 points = g.points, leader = g.leader
             }
-            if g.pending_icon and g.pending_icon ~= '' then
+            if hasPendingIcon(g) then
                 payload.pendingIcons[#payload.pendingIcons + 1] = {
-                    id = g.id, label = g.label, current = g.icon, pending = g.pending_icon
+                    id = g.id, label = g.label,
+                    current = g.icon, pending = g.pending_icon,
+                    currentImage = g.icon_image, pendingImage = g.pending_icon_image
                 }
             end
         end
@@ -444,6 +508,10 @@ end)
 
 RegisterNetEvent('wsmm_gangs:requestBlips', function()
     WG.RefreshBlips(source)
+end)
+
+RegisterNetEvent('wsmm_gangs:uploadIcon', function(data)
+    WG.SavePendingIcon(source, data or {})
 end)
 
 RegisterNetEvent('wsmm_gangs:action', function(action, data)
@@ -540,12 +608,16 @@ RegisterNetEvent('wsmm_gangs:action', function(action, data)
         WG.RefreshBlipsAll()
 
     elseif action == 'requestIcon' then
-        if not WG.IsLeader(member) then return WG.Notify(src, 'not_leader') end
+        local g = iconEditGang(member, admin, data)
+        if not g then return WG.Notify(src, admin and 'not_admin' or 'not_leader') end
         local ic = WGIcon(data.icon)
-        MySQL.update.await('UPDATE wsmm_gangs SET pending_icon = ? WHERE id = ?', { ic.id, gang.id })
+        MySQL.update.await('UPDATE wsmm_gangs SET pending_icon = ? WHERE id = ?', { ic.id, g.id })
         WG.Reload()
         WG.Notify(src, 'icon_pending')
-        WG.LogActivity(src, gang.id, 'icon_request', ic.id)
+        WG.LogActivity(src, g.id, 'icon_request', ic.id)
+
+    elseif action == 'uploadIcon' then
+        WG.SavePendingIcon(src, data)
 
     elseif action == 'setRank' then
         if not WG.IsLeader(member) then return WG.Notify(src, 'not_leader') end
@@ -685,9 +757,19 @@ RegisterNetEvent('wsmm_gangs:action', function(action, data)
         if not admin then return WG.Notify(src, 'not_admin') end
         local gid = tonumber(data.gangId)
         local g = gid and WG.Gangs[gid]
-        if not g or not g.pending_icon then return end
-        local iconId = g.pending_icon
-        MySQL.update.await('UPDATE wsmm_gangs SET icon = pending_icon, pending_icon = NULL WHERE id = ?', { gid })
+        if not g or not hasPendingIcon(g) then return end
+        local iconId = (g.pending_icon and g.pending_icon ~= '') and g.pending_icon or (g.pending_icon_image and 'image' or g.icon)
+        MySQL.update.await([[
+            UPDATE wsmm_gangs SET
+                icon = COALESCE(NULLIF(pending_icon, ''), icon),
+                icon_image = CASE
+                    WHEN pending_icon_image IS NOT NULL AND pending_icon_image != '' THEN pending_icon_image
+                    ELSE icon_image
+                END,
+                pending_icon = NULL,
+                pending_icon_image = NULL
+            WHERE id = ?
+        ]], { gid })
         WG.Reload()
         WG.LogActivity(src, gid, 'icon_approve', iconId)
         WG.PushNotif(gid, 'icon', 'icon_approved', iconId)
@@ -699,7 +781,7 @@ RegisterNetEvent('wsmm_gangs:action', function(action, data)
         local gid = tonumber(data.gangId)
         local g = gid and WG.Gangs[gid]
         if not g then return end
-        MySQL.update.await('UPDATE wsmm_gangs SET pending_icon = NULL WHERE id = ?', { gid })
+        MySQL.update.await('UPDATE wsmm_gangs SET pending_icon = NULL, pending_icon_image = NULL WHERE id = ?', { gid })
         WG.Reload()
         WG.LogActivity(src, gid, 'icon_reject', g.icon or Config.DefaultIcon)
         WG.PushNotif(gid, 'icon', 'icon_rejected', g.icon or Config.DefaultIcon)
@@ -709,6 +791,18 @@ RegisterNetEvent('wsmm_gangs:action', function(action, data)
         if not admin then return WG.Notify(src, 'not_admin') end
         WG.WipeAllSprays()
         WG.Notify(src, 'spray_deleted')
+
+    elseif action == 'setZoneOpen' then
+        if not admin then return WG.Notify(src, 'not_admin') end
+        local zoneId = tostring(data.zoneId or '')
+        local st = WG.ZoneState[zoneId]
+        if not st then return end
+        local open = (tonumber(data.open) == 1 or data.open == true) and 1 or 0
+        st.open = open
+        WG.SaveZone(zoneId)
+        WG.LogActivity(src, nil, open == 1 and 'zone_open' or 'zone_lock', zoneId)
+        WG.Notify(src, open == 1 and 'zone_opened' or 'zone_locked')
+        WG.RefreshBlipsAll()
     end
 end)
 

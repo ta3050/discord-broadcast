@@ -7,18 +7,29 @@ function WGLabel(field, lang)
     return field or ''
 end
 
+function WGZoneHalf(z)
+    if not z then return 90.0 end
+    return (z.size or z.radius or 90.0) + 0.0
+end
+
+-- Axis-aligned square (never a circle). Closest center wins if boxes overlap.
 function WGGetZoneAt(coords)
     if not coords then return nil end
     local x, y = coords.x or coords[1], coords.y or coords[2]
+    local best, bestD = nil, nil
     for i = 1, #Config.Zones do
         local z = Config.Zones[i]
         local c = z.coords
+        local half = WGZoneHalf(z)
         local dx, dy = x - c.x, y - c.y
-        if (dx * dx + dy * dy) <= (z.radius * z.radius) then
-            return z
+        if math.abs(dx) <= half and math.abs(dy) <= half then
+            local d = dx * dx + dy * dy
+            if not bestD or d < bestD then
+                best, bestD = z, d
+            end
         end
     end
-    return nil
+    return best
 end
 
 function WGColor(id)
@@ -51,6 +62,25 @@ function WGNormalize(text)
     text = text:gsub('أ', 'ا'):gsub('إ', 'ا'):gsub('آ', 'ا'):gsub('ة', 'ه'):gsub('ى', 'ي')
     text = text:gsub('[%s%p]+', ' ')
     return text
+end
+
+function WGSanitizeIconDataUrl(s)
+    if type(s) ~= 'string' then return nil end
+    local maxUrl = (Config.IconUpload and Config.IconUpload.maxDataUrl) or 700000
+    local maxBytes = (Config.IconUpload and Config.IconUpload.maxBytes) or (512 * 1024)
+    if #s < 32 or #s > maxUrl then return nil end
+    local mime, b64 = s:match('^data:(image/[%w%+%.%-]+);base64,([A-Za-z0-9+/=]+)$')
+    if not mime or not b64 then return nil end
+    mime = mime:lower()
+    if mime == 'image/jpg' then mime = 'image/jpeg' end
+    local allowed = Config.IconUpload and Config.IconUpload.mime
+    if not allowed or not allowed[mime] then return nil end
+    local approx = math.floor(#b64 * 3 / 4)
+    if approx > maxBytes then return nil end
+    if mime == 'image/png' and not b64:find('^iVBOR') then return nil end
+    if mime == 'image/jpeg' and not b64:find('^/9j/') then return nil end
+    if mime == 'image/webp' and not b64:find('^UklGR') then return nil end
+    return 'data:' .. mime .. ';base64,' .. b64
 end
 
 function WGBanned(text)

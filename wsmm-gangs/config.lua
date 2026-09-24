@@ -71,21 +71,39 @@ Config.Icons = {
 
 Config.DefaultIcon = 'gang'
 
+-- Custom PNG/JPG/WEBP for the tablet map only. GTA pause-map blips cannot
+-- take a custom PNG without a streamed texture dictionary, so in-game markers
+-- keep the sprite from Config.Icons (default `gang` until a list icon is approved).
+Config.IconUpload = {
+    maxBytes = 512 * 1024,
+    maxDataUrl = 700000,
+    size = 128,
+    mime = {
+        ['image/png'] = true,
+        ['image/jpeg'] = true,
+        ['image/jpg'] = true,
+        ['image/webp'] = true
+    }
+}
+
+-- Tablet PNG is Los Santos city (html/los-santos-map.png). `map` is percent box on that image.
+-- `size` is half-extent in meters for in-game SQUARE detection + pause-map area blips (never circles).
+-- Sandy / Paleto stay in-game only (off this city map). Admin can open/lock claimable zones.
 Config.Zones = {
-    { id = 'grove',       label = { ar = 'قروف ستريت', en = 'Grove Street' },       coords = vector3(-132.4, -1609.2, 32.0),  radius = 95.0 },
-    { id = 'chamberlain', label = { ar = 'تشامبرلين', en = 'Chamberlain Hills' },   coords = vector3(-220.0, -1490.0, 31.0),  radius = 90.0 },
-    { id = 'forum',       label = { ar = 'فوروم درايف', en = 'Forum Drive' },        coords = vector3(-184.0, -1666.0, 33.0),  radius = 80.0 },
-    { id = 'davis',       label = { ar = 'ديفيس', en = 'Davis' },                   coords = vector3(96.0, -1735.0, 29.0),    radius = 95.0 },
-    { id = 'rancho',      label = { ar = 'رانشو', en = 'Rancho' },                  coords = vector3(412.0, -2012.0, 23.0),   radius = 110.0 },
-    { id = 'strawberry',  label = { ar = 'ستروبيري', en = 'Strawberry' },           coords = vector3(56.0, -1350.0, 29.0),    radius = 90.0 },
-    { id = 'lamesa',      label = { ar = 'لا ميسا', en = 'La Mesa' },               coords = vector3(860.0, -1750.0, 29.0),   radius = 110.0 },
-    { id = 'cypress',     label = { ar = 'سايبريس فلاتس', en = 'Cypress Flats' },    coords = vector3(860.0, -2360.0, 30.0),   radius = 120.0 },
-    { id = 'elburro',     label = { ar = 'إل بورّو', en = 'El Burro Heights' },     coords = vector3(1380.0, -2100.0, 50.0),  radius = 130.0 },
-    { id = 'mirror',      label = { ar = 'ميرور بارك', en = 'Mirror Park' },         coords = vector3(1078.0, -540.0, 58.0),   radius = 110.0 },
-    { id = 'vinewood',    label = { ar = 'فاينوود', en = 'Downtown Vinewood' },     coords = vector3(318.0, 180.0, 103.0),    radius = 120.0 },
-    { id = 'delperro',    label = { ar = 'ديل بيرو', en = 'Del Perro' },             coords = vector3(-1550.0, -580.0, 33.0),  radius = 130.0 },
-    { id = 'sandy',       label = { ar = 'ساندي شورز', en = 'Sandy Shores' },        coords = vector3(1848.0, 3680.0, 34.0),   radius = 160.0 },
-    { id = 'paleto',      label = { ar = 'باليتو باي', en = 'Paleto Bay' },          coords = vector3(-140.0, 6350.0, 31.0),   radius = 170.0 }
+    { id = 'grove',       label = { ar = 'قروف ستريت', en = 'Grove Street' },       coords = vector3(-132.4, -1609.2, 32.0),  size = 95.0,  map = { x = 46.5, y = 55.5, w = 6.4, h = 6.2 } },
+    { id = 'chamberlain', label = { ar = 'تشامبرلين', en = 'Chamberlain Hills' },   coords = vector3(-220.0, -1490.0, 31.0),  size = 90.0,  map = { x = 41.8, y = 51.8, w = 5.6, h = 5.6 } },
+    { id = 'forum',       label = { ar = 'فوروم درايف', en = 'Forum Drive' },        coords = vector3(-184.0, -1666.0, 33.0),  size = 80.0,  map = { x = 40.6, y = 57.4, w = 5.2, h = 5.2 } },
+    { id = 'davis',       label = { ar = 'ديفيس', en = 'Davis' },                   coords = vector3(96.0, -1735.0, 29.0),    size = 95.0,  map = { x = 51.4, y = 59.2, w = 6.4, h = 6.2 } },
+    { id = 'rancho',      label = { ar = 'رانشو', en = 'Rancho' },                  coords = vector3(412.0, -2012.0, 23.0),   size = 110.0, map = { x = 57.2, y = 64.4, w = 7.2, h = 6.8 } },
+    { id = 'strawberry',  label = { ar = 'ستروبيري', en = 'Strawberry' },           coords = vector3(56.0, -1350.0, 29.0),    size = 90.0,  map = { x = 47.2, y = 48.8, w = 6.2, h = 5.8 } },
+    { id = 'lamesa',      label = { ar = 'لا ميسا', en = 'La Mesa' },               coords = vector3(860.0, -1750.0, 29.0),   size = 110.0, map = { x = 65.8, y = 57.6, w = 7.2, h = 6.8 } },
+    { id = 'cypress',     label = { ar = 'سايبريس فلاتس', en = 'Cypress Flats' },    coords = vector3(860.0, -2360.0, 30.0),   size = 120.0, map = { x = 64.8, y = 70.8, w = 7.6, h = 7.0 } },
+    { id = 'elburro',     label = { ar = 'إل بورّو', en = 'El Burro Heights' },     coords = vector3(1380.0, -2100.0, 50.0),  size = 130.0, map = { x = 75.4, y = 65.6, w = 8.6, h = 8.0 } },
+    { id = 'mirror',      label = { ar = 'ميرور بارك', en = 'Mirror Park' },         coords = vector3(1078.0, -540.0, 58.0),   size = 110.0, map = { x = 70.4, y = 31.4, w = 7.4, h = 7.0 } },
+    { id = 'vinewood',    label = { ar = 'فاينوود', en = 'Downtown Vinewood' },     coords = vector3(318.0, 180.0, 103.0),    size = 120.0, map = { x = 55.4, y = 15.6, w = 8.0, h = 7.2 } },
+    { id = 'delperro',    label = { ar = 'ديل بيرو', en = 'Del Perro' },             coords = vector3(-1550.0, -580.0, 33.0),  size = 130.0, map = { x = 16.8, y = 32.4, w = 8.8, h = 8.2 } },
+    { id = 'sandy',       label = { ar = 'ساندي شورز', en = 'Sandy Shores' },        coords = vector3(1848.0, 3680.0, 34.0),   size = 160.0 },
+    { id = 'paleto',      label = { ar = 'باليتو باي', en = 'Paleto Bay' },          coords = vector3(-140.0, 6350.0, 31.0),   size = 170.0 }
 }
 
 -- Server-side substring check after light normalize. Keep short to avoid lag.

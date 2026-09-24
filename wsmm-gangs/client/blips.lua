@@ -19,9 +19,12 @@ RegisterNetEvent('wsmm_gangs:blips', function(payload)
     blips = {}
 
     for _, t in ipairs(payload.publicTurfs or {}) do
-        local b = add(blips, AddBlipForRadius(t.x, t.y, t.z, t.radius + 0.0))
-        SetBlipColour(b, t.blipColor or 1)
-        SetBlipAlpha(b, 80)
+        local half = (t.size or t.radius or 90) + 0.0
+        local area = add(blips, AddBlipForArea(t.x + 0.0, t.y + 0.0, t.z + 0.0, half * 2.0, half * 2.0))
+        SetBlipColour(area, t.blipColor or 1)
+        SetBlipAlpha(area, 90)
+        SetBlipRotation(area, 0)
+        SetBlipAsShortRange(area, true)
         local icon = add(blips, AddBlipForCoord(t.x, t.y, t.z))
         SetBlipSprite(icon, t.sprite or 437)
         SetBlipColour(icon, t.blipColor or 1)

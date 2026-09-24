@@ -15,6 +15,13 @@ function $(id) { return document.getElementById(id); }
 
 function post(name, data) {
   if (MOCK) {
+    if (name === 'action' && data && data.a === 'setZoneOpen') {
+      const z = (S.places || []).find((p) => p.id === data.zoneId);
+      if (z) {
+        z.open = Number(data.open) === 1;
+        render();
+      }
+    }
     console.log(name, data);
     return Promise.resolve({ ok: true });
   }
@@ -52,7 +59,7 @@ function navItems() {
     ['notifs', 'notifs']
   ];
   if (S.isLeader || S.isAdmin) items.push(['logs', 'logs']);
-  if (S.isLeader) items.push(['leader', 'leader']);
+  if (S.isLeader || (S.isAdmin && S.gang)) items.push(['leader', 'leader']);
   if (S.isAdmin) items.push(['admin', 'admin']);
   return items;
 }
@@ -72,6 +79,10 @@ function renderNav() {
 function esc(s) {
   return String(s == null ? '' : s)
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+}
+
+function safeImg(src) {
+  return (src && /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/]+=*$/.test(src)) ? src : '';
 }
 
 function colorHex(id) {
@@ -98,6 +109,8 @@ function home() {
   const g = S.gang;
   if (!g) return `<div class="card">${t('not_member')}</div>`;
   const rank = (S.rankings || []).findIndex((x) => x.id === g.id);
+  const live = safeImg(g.iconImage);
+  const pend = (S.isLeader || S.isAdmin) ? safeImg(g.pendingIconImage) : '';
   return `<div class="cards">
       <div class="card">${t('points')}<b class="big">${g.points || 0}</b></div>
       <div class="card">${t('sprays')}<b class="big">${g.sprays || 0}</b></div>
@@ -105,7 +118,11 @@ function home() {
     </div>
     <div class="card">${esc(g.label)} <span class="tag">[${esc(g.tag || '')}]</span>
       <div class="xp">${t('color')}: ${esc(g.color || '')}
-        ${(S.isLeader || S.isAdmin) && g.pendingIcon ? ' · ' + t('pending') + ': ' + esc(iconLabel(g.pendingIcon)) : ''}
+        ${(S.isLeader || S.isAdmin) && (g.pendingIcon || pend) ? ' · ' + t('pending') + (g.pendingIcon ? ': ' + esc(iconLabel(g.pendingIcon)) : '') : ''}
+      </div>
+      <div class="row" style="margin-top:10px">
+        ${live ? `<img class="icon-prev" alt="" src="${live}"/>` : ''}
+        ${pend ? `<div><div class="lbl">${t('pending')}</div><img class="icon-prev" alt="" src="${pend}"/></div>` : ''}
       </div>
     </div>`;
 }
@@ -117,34 +134,59 @@ function hexRgba(hex, a) {
   return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`;
 }
 
-function mapPos(x, y, radius) {
-  const left = 8 + ((Number(x) + 3200) / 7400) * 84;
-  const top = 10 + (1 - (Number(y) + 3800) / 11200) * 80;
-  const size = Math.max(64, Math.min(124, 56 + (Number(radius) || 90) * 0.3));
-  return { left, top, size };
+function mapBox(z) {
+  if (z.map && z.map.w) {
+    return { left: z.map.x, top: z.map.y, w: z.map.w, h: z.map.h || z.map.w };
+  }
+  const x = Number(z.x), y = Number(z.y);
+  const left = 12 + ((x + 1850) / 2950) * 60;
+  const top = 12 + ((400 - y) / 3200) * 70;
+  const w = Math.max(5.2, Math.min(10, (Number(z.size || z.radius) || 90) * 0.055));
+  if (left < -3 || left > 103 || top < -3 || top > 103) return null;
+  return { left, top, w, h: w };
 }
 
 function mapView() {
   const zones = S.places || [];
-  if (!zones.length) return `<div class="card">${t('none')}</div>`;
-  return `<div class="gta-map">
-      <div class="land"></div>
-      <div class="road" style="left:18%;top:46%;width:62%;height:6px;--r:-8deg"></div>
-      <div class="road" style="left:40%;top:18%;width:6px;height:64%;--r:6deg"></div>
-      <div class="road" style="left:22%;top:62%;width:50%;height:5px;--r:12deg"></div>
-      ${zones.map((z) => {
-        const p = mapPos(z.x, z.y, z.radius);
-        const c = z.hex || colorHex(z.color);
-        return `<div class="turf" style="left:${p.left}%;top:${p.top}%;width:${p.size}px;height:${p.size}px;border-color:${c};background:${hexRgba(c, 0.28)};box-shadow:0 0 18px ${hexRgba(c, 0.45)}">
-          <span class="dot" style="background:${c}"></span>
-          <span class="lab">${esc(z.label)}<br><span class="tag">${esc(z.owner || t('none'))}</span></span>
-        </div>`;
-      }).join('')}
-      <div class="legend"><b>${t('map_legend')}</b>
-        ${zones.map((z) => `<div><i style="background:${z.hex || colorHex(z.color)}"></i> ${esc(z.label)} — ${esc(z.owner || t('none'))}</div>`).join('')}
-      </div>
+  const claimed = zones.filter((z) => z.open !== false && z.claimed && z.owner);
+  const boxes = zones.map((z) => {
+    if (z.open === false) return '';
+    const p = mapBox(z);
+    if (!p) return '';
+    const claimedZone = !!(z.claimed && z.owner);
+    const c = z.hex || colorHex(z.color);
+    const img = claimedZone ? safeImg(z.iconImage) : '';
+    const cls = claimedZone ? 'turf claimed' : 'turf open';
+    const style = claimedZone
+      ? `left:${p.left}%;top:${p.top}%;width:${p.w}%;height:${p.h}%;--c:${c};border-color:${c};background:${hexRgba(c, 0.32)}`
+      : `left:${p.left}%;top:${p.top}%;width:${p.w}%;height:${p.h}%`;
+    return `<div class="${cls}" style="${style}">
+        ${img ? `<img class="turf-icon" alt="" src="${img}"/>` : ''}
+        ${claimedZone ? `<span class="lab">${esc(z.owner)}</span>` : ''}
+      </div>`;
+  }).join('');
+  return `<div class="gta-map">${boxes}
+      ${claimed.length ? `<div class="legend"><b>${t('map_legend')}</b>
+        ${claimed.map((z) => `<div><i style="background:${z.hex || colorHex(z.color)}"></i> ${esc(z.label)} — ${esc(z.owner)}</div>`).join('')}
+      </div>` : ''}
     </div>
-    <p class="hint">${t('map_hint')}</p>`;
+    <p class="hint">${t('map_hint')}</p>
+    ${S.isAdmin ? zoneAdmin() : ''}`;
+}
+
+function zoneAdmin() {
+  const zones = S.places || [];
+  if (!zones.length) return '';
+  return `<div class="card"><b>${t('zones_admin')}</b>
+    <p class="hint">${t('map_open_hint')}</p>
+    ${zones.map((z) => `<div class="log">
+      <b>${esc(z.label)}</b>
+      <span class="xp">${z.open === false ? t('zone_locked_state') : t('zone_open_state')}${z.owner ? ' · ' + esc(z.owner) : ''}</span>
+      ${z.open === false
+        ? `<button class="btn ok" data-act='{"a":"setZoneOpen","zoneId":"${esc(z.id)}","open":1}'>${t('zone_open')}</button>`
+        : `<button class="btn2" data-act='{"a":"setZoneOpen","zoneId":"${esc(z.id)}","open":0}'>${t('zone_lock')}</button>`}
+    </div>`).join('')}
+  </div>`;
 }
 
 function places() { return mapView(); }
@@ -156,8 +198,9 @@ function rankings() {
   const rest = list.slice(3);
   const spot = (g, cls, place, medal) => {
     if (!g) return `<div class="spot ${cls}"></div>`;
+    const img = safeImg(g.iconImage);
     return `<div class="spot ${cls}">
-      <div class="avatar">${medal}</div>
+      <div class="avatar">${img ? `<img alt="" src="${img}"/>` : medal}</div>
       <div class="name">${esc(g.label)}</div>
       <div class="tag">[${esc(g.tag || '')}]</div>
       <div class="xp">${t('points')} ${g.score || g.points || 0} · ${g.sprays || 0} ${t('sprays')}</div>
@@ -230,6 +273,70 @@ function sprayPage() {
     </div>`;
 }
 
+function iconGangId() {
+  const sel = $('g-sel');
+  if (sel && sel.value) return Number(sel.value);
+  return S.gang && S.gang.id;
+}
+
+function compressIcon(file) {
+  return new Promise((resolve, reject) => {
+    if (!file || !/^image\/(png|jpeg|jpg|webp)$/i.test(file.type)) {
+      reject('icon_bad_type');
+      return;
+    }
+    if (file.size > 512 * 1024) {
+      reject('icon_too_big');
+      return;
+    }
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      const size = 128;
+      const c = document.createElement('canvas');
+      c.width = size;
+      c.height = size;
+      c.getContext('2d').drawImage(img, 0, 0, size, size);
+      URL.revokeObjectURL(url);
+      let out = '';
+      try { out = c.toDataURL('image/jpeg', 0.82); } catch (err) { out = ''; }
+      if (!out || out.length < 32) out = c.toDataURL('image/png');
+      if (out.length > 700000) reject('icon_too_big');
+      else resolve(out);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject('icon_bad_type'); };
+    img.src = url;
+  });
+}
+
+function bindIconUpload() {
+  const f = $('iconfile');
+  if (!f) return;
+  f.onchange = () => {
+    const file = f.files && f.files[0];
+    f.value = '';
+    if (!file) return;
+    compressIcon(file).then((dataUrl) => {
+      if (MOCK) {
+        if (!S.gang) S.gang = {};
+        S.gang.pendingIconImage = dataUrl;
+        S.pendingIcons = S.pendingIcons || [];
+        if (S.pendingIcons[0]) S.pendingIcons[0].pendingImage = dataUrl;
+        else S.pendingIcons.push({
+          id: S.gang.id || 1, label: S.gang.label || '', current: S.gang.icon,
+          pending: S.gang.pendingIcon, pendingImage: dataUrl
+        });
+        toast(t('icon_pending'));
+        render();
+        return;
+      }
+      post('uploadIcon', { image: dataUrl, gangId: iconGangId() });
+      toast(t('icon_pending'));
+      setTimeout(() => post('refresh'), 400);
+    }).catch((key) => toast(t(key)));
+  };
+}
+
 function bindSprayPage() {
   const cv = $('spray-cv');
   if (!cv) return;
@@ -290,11 +397,33 @@ function logs() {
   return html;
 }
 
-function leader() {
-  if (!S.isLeader) return `<div class="card">${t('not_leader')}</div>`;
+function iconEditor() {
+  const can = S.isLeader || (S.isAdmin && S.gang);
+  if (!can && !S.isAdmin) return '';
   const icons = (S.icons || []).map((ic) =>
     `<option value="${ic.id}">${lang === 'ar' ? ic.ar : ic.en}</option>`
   ).join('');
+  const g = S.gang || {};
+  const live = safeImg(g.iconImage);
+  const pend = safeImg(g.pendingIconImage);
+  return `<div class="card"><b>${t('icon')}</b>
+      <p class="hint">${t('icon_upload_hint')}</p>
+      <select class="inp" id="icon-sel">${icons}</select>
+      <input type="file" id="iconfile" accept="image/png,image/jpeg,image/webp" class="hidden"/>
+      <div class="row">
+        <button class="btn" id="icon-upload" type="button">${t('upload_icon')}</button>
+        <button class="btn2" id="icon-go" type="button">${t('request_icon')}</button>
+      </div>
+      <p class="hint">${t('icon_blip_note')}</p>
+      <div class="row">
+        ${live ? `<div><div class="lbl">${t('icon_preview')}</div><img class="icon-prev" alt="" src="${live}"/></div>` : ''}
+        ${pend ? `<div><div class="lbl">${t('pending')}</div><img class="icon-prev" alt="" src="${pend}"/></div>` : ''}
+      </div>
+    </div>`;
+}
+
+function leader() {
+  if (!S.isLeader && !(S.isAdmin && S.gang)) return `<div class="card">${t('not_leader')}</div>`;
   const colors = (S.colors || []).map((c) =>
     `<button class="swatch" data-act='{"a":"setColor","color":"${c.id}"}' style="background:${c.hex}" title="${lang === 'ar' ? c.ar : c.en}"></button>`
   ).join(' ');
@@ -310,10 +439,7 @@ function leader() {
         <p class="hint">${t('color')}</p>
         <div class="row">${colors}</div>
       </div>
-      <div class="card"><b>${t('icon')}</b><p class="hint">${t('pending')}</p>
-        <select class="inp" id="icon-sel">${icons}</select>
-        <button class="btn" id="icon-go">${t('request_icon')}</button>
-      </div>
+      ${iconEditor()}
     </div>
     <div class="card"><b>${t('announce')}</b><input class="inp" id="ann" placeholder="${t('announce')}"/><button class="btn" id="ann-go">${t('announce')}</button></div>
     <div class="card"><b>${t('members')}</b>${mem}
@@ -324,11 +450,20 @@ function leader() {
 function admin() {
   if (!S.isAdmin) return `<div class="card">${t('not_admin')}</div>`;
   const gangs = (S.gangs || []).map((g) => `<option value="${g.id}">${esc(g.label)}</option>`).join('');
-  const pending = (S.pendingIcons || []).map((p) => `<div class="log">
-    ${esc(p.label)}: ${esc(iconLabel(p.current))} → ${esc(iconLabel(p.pending))}
-    <button class="btn ok" data-act='{"a":"approveIcon","gangId":${p.id}}'>${t('approve')}</button>
-    <button class="btn no" data-act='{"a":"rejectIcon","gangId":${p.id}}'>${t('reject')}</button>
-  </div>`).join('') || `<div class="xp">${t('none')}</div>`;
+  const pending = (S.pendingIcons || []).map((p) => {
+    const img = safeImg(p.pendingImage) || safeImg(p.currentImage);
+    const nextLabel = p.pendingImage ? t('icon_image_pending') : iconLabel(p.pending);
+    return `<div class="log spray-item">
+      ${img ? `<img class="spray-thumb" alt="" src="${img}"/>` : `<div class="spray-thumb wall-text">${esc(nextLabel || t('icon'))}</div>`}
+      <div><b>${esc(p.label)}</b>
+        <div class="xp">${esc(iconLabel(p.current) || t('none'))} → ${esc(nextLabel)}</div>
+      </div>
+      <div>
+        <button class="btn ok" data-act='{"a":"approveIcon","gangId":${p.id}}'>${t('approve')}</button>
+        <button class="btn no" data-act='{"a":"rejectIcon","gangId":${p.id}}'>${t('reject')}</button>
+      </div>
+    </div>`;
+  }).join('') || `<div class="xp">${t('none')}</div>`;
   return `<div class="grid2">
       <div class="card"><b>${t('create_gang')}</b>
         <input class="inp" id="g-name" placeholder="${t('name')}"/>
@@ -345,6 +480,8 @@ function admin() {
         <button class="btn no" id="g-del">${t('delete_gang')}</button>
       </div>
     </div>
+    ${iconEditor()}
+    ${zoneAdmin()}
     <div class="card"><b>${t('pending_icons')}</b>${pending}</div>
     <div class="card"><b>${t('all_sprays')}</b>
       <button class="btn2" id="g-wipe">${t('wipe_gang_sprays')}</button>
@@ -369,6 +506,7 @@ function render() {
   renderNav();
   $('page').innerHTML = (views[page] || home)();
   if (page === 'spray') bindSprayPage();
+  bindIconUpload();
 }
 
 function openTablet(data) {
@@ -415,9 +553,15 @@ $('page').onclick = (e) => {
     setTimeout(() => post('refresh'), 250);
     return;
   }
+  if (e.target.id === 'icon-upload') {
+    const f = $('iconfile');
+    if (f) f.click();
+    return;
+  }
   if (e.target.id === 'icon-go') {
-    post('action', { a: 'requestIcon', icon: $('icon-sel').value });
+    post('action', { a: 'requestIcon', icon: $('icon-sel').value, gangId: iconGangId() });
     setTimeout(() => post('refresh'), 250);
+    return;
   }
   if (e.target.id === 'guest-go') {
     post('action', { a: 'inviteGuest', id: $('guest-id').value });
@@ -552,8 +696,12 @@ if (MOCK) {
     tablet_title: 'WSMM GANGS', close: 'إغلاق', home: 'عصابتي', places: 'الخريطة',
     points: 'النقاط', rankings: 'ترتيب العصابات', members: 'أعضاء العصابة', summon: 'استدعاء كامل',
     guest: 'الدعوات', logs: 'السجلات', sprays: 'البخات', place: 'الترتيب',
-    notifs: 'التنويهات', map_legend: 'مناطق العصابات',
-    map_hint: 'خريطة لوس سانتوس: كل دائرة تيرف عصابة. اللون = العصابة المسيطرة. الفاضي بدون سيطرة.',
+    notifs: 'التنويهات',     map_legend: 'مناطق العصابات',
+    map_hint: 'خريطة لوس سانتوس: المربع الملوّن = تيرف عصيبة. المتقطع = مفتوح فاضي. المقفول نظيف بدون رسم.',
+    map_open_hint: 'الأدمن يفتح أو يقفل المطالبة. المقفول ما ينرسم على الخريطة وما ينأخذ.',
+    zones_admin: 'المناطق (فتح / قفل)',
+    zone_open: 'فتح', zone_lock: 'قفل',
+    zone_open_state: 'مفتوحة للمطالبة', zone_locked_state: 'مقفلة',
     spray_hint: 'وضعين: رسم حر أو كتابة. بدون رفع صور. الكلام الوسخ ينحجب.',
     spray_wall_hint: 'البخ الحقيقي على الجدار بعلبة البخاخ. هالصفحة للتجربة داخل التابلت.',
     logs_only: 'السجلات لليدر والإدارة فقط.', request_icon: 'طلب الأيقونة',
@@ -598,16 +746,20 @@ if (MOCK) {
       { id: 'crown', ar: 'تاج', en: 'Crown' }, { id: 'gun', ar: 'سلاح', en: 'Gun' }
     ],
     places: [
-      { id: 'grove', label: 'قروف ستريت', owner: 'آل فخامة', hex: '#e74c3c', x: -132, y: -1609, radius: 95 },
-      { id: 'davis', label: 'ديفيس', owner: 'بلوود', hex: '#9b1c2c', x: 96, y: -1735, radius: 95 },
-      { id: 'strawberry', label: 'ستروبيري', owner: 'قولدن', hex: '#e2b039', x: 56, y: -1350, radius: 90 },
-      { id: 'vinewood', label: 'فاينوود', owner: 'آل تشابو', hex: '#e67e22', x: 318, y: 180, radius: 120 },
-      { id: 'delperro', label: 'ديل بيرو', owner: null, hex: '#8d9199', x: -1550, y: -580, radius: 130 },
-      { id: 'sandy', label: 'ساندي شورز', owner: 'آل محترم', hex: '#3498db', x: 1848, y: 3680, radius: 160 },
-      { id: 'paleto', label: 'باليتو باي', owner: null, hex: '#27ae60', x: -140, y: 6350, radius: 170 },
-      { id: 'elburro', label: 'إل بورّو', owner: 'آل بارود', hex: '#9b59b6', x: 1380, y: -2100, radius: 130 },
-      { id: 'mirror', label: 'ميرور بارك', owner: null, hex: '#8d9199', x: 1078, y: -540, radius: 110 },
-      { id: 'rancho', label: 'رانشو', owner: null, hex: '#8d9199', x: 412, y: -2012, radius: 110 }
+      { id: 'grove', label: 'قروف ستريت', owner: 'آل فخامة', hex: '#e74c3c', claimed: true, open: true, map: { x: 46.5, y: 55.5, w: 6.4, h: 6.2 } },
+      { id: 'davis', label: 'ديفيس', owner: 'بلوود', hex: '#9b1c2c', claimed: true, open: true, map: { x: 51.4, y: 59.2, w: 6.4, h: 6.2 } },
+      { id: 'strawberry', label: 'ستروبيري', owner: 'قولدن', hex: '#e2b039', claimed: true, open: true, map: { x: 47.2, y: 48.8, w: 6.2, h: 5.8 } },
+      { id: 'vinewood', label: 'فاينوود', owner: 'آل تشابو', hex: '#e67e22', claimed: true, open: true, map: { x: 55.4, y: 15.6, w: 8.0, h: 7.2 } },
+      { id: 'delperro', label: 'ديل بيرو', owner: null, claimed: false, open: true, map: { x: 16.8, y: 32.4, w: 8.8, h: 8.2 } },
+      { id: 'mirror', label: 'ميرور بارك', owner: null, claimed: false, open: true, map: { x: 70.4, y: 31.4, w: 7.4, h: 7.0 } },
+      { id: 'rancho', label: 'رانشو', owner: null, claimed: false, open: true, map: { x: 57.2, y: 64.4, w: 7.2, h: 6.8 } },
+      { id: 'elburro', label: 'إل بورّو', owner: 'آل بارود', hex: '#9b59b6', claimed: true, open: true, map: { x: 75.4, y: 65.6, w: 8.6, h: 8.0 } },
+      { id: 'chamberlain', label: 'تشامبرلين', owner: null, claimed: false, open: false, map: { x: 41.8, y: 51.8, w: 5.6, h: 5.6 } },
+      { id: 'forum', label: 'فوروم درايف', owner: null, claimed: false, open: false, map: { x: 40.6, y: 57.4, w: 5.2, h: 5.2 } },
+      { id: 'lamesa', label: 'لا ميسا', owner: null, claimed: false, open: true, map: { x: 65.8, y: 57.6, w: 7.2, h: 6.8 } },
+      { id: 'cypress', label: 'سايبريس فلاتس', owner: null, claimed: false, open: true, map: { x: 64.8, y: 70.8, w: 7.6, h: 7.0 } },
+      { id: 'sandy', label: 'ساندي شورز', owner: 'آل محترم', hex: '#3498db', claimed: true, open: true },
+      { id: 'paleto', label: 'باليتو باي', owner: null, claimed: false, open: false }
     ],
     rankings: [
       { id: 1, label: 'آل فخامة', tag: 'DARK', points: 35135, sprays: 12, zones: 1, score: 35135 },

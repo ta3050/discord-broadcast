@@ -56,12 +56,20 @@ Nothing is sent to Discord. Regular members cannot open these lists; the server 
 
 | Blip | Who sees it |
 |------|-------------|
-| Public turf radius + icon (claimed zones) | Everyone |
+| Public turf **square** (claimed + open zones) | Everyone |
 | Gang HQ | That gang + admins |
 | Active summon | That gang only |
 | Spray wall markers | Leader + admin only |
 
-Map icon: leader picks from a list → **admin approve/reject**. Until approved, the old/default icon stays. Reject notifies the leader in the tablet (and is written to the activity log).
+Tablet map uses the real **Los Santos** image (`html/los-santos-map.png`). Territories are **squares**, never circles.
+
+- **Claimed** (and open): colored square + gang name.
+- **Open unclaimed**: faint dashed square only — the map stays clean (no colored blob).
+- **Locked**: no overlay. Admin opens/locks which zones gangs may claim.
+
+In-game pause map uses `AddBlipForArea` squares for claimed open turf. GTA cannot paint a custom PNG onto pause-map blips without a streamed texture dictionary, so those stay default sprites. Uploaded gang images show on the **tablet map** after admin approval.
+
+Map icon: leader uploads PNG/JPG/WEBP (max 512 KB) or picks a list icon → **admin approve/reject**. Until approved, the old icon stays. Spray has **no** image upload (draw/text only).
 
 ## Ranks
 

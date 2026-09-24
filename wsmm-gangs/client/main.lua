@@ -69,6 +69,11 @@ RegisterNUICallback('action', function(data, cb)
     cb({ ok = true })
 end)
 
+RegisterNUICallback('uploadIcon', function(data, cb)
+    TriggerLatentServerEvent('wsmm_gangs:uploadIcon', 40000, data or {})
+    cb({ ok = true })
+end)
+
 RegisterNUICallback('refresh', function(_, cb)
     TriggerServerEvent('wsmm_gangs:requestTablet', lang)
     cb({ ok = true })
