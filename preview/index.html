@@ -130,7 +130,24 @@
     }
     .legend div { display: flex; align-items: center; gap: 8px; font-size: 12px; margin: 3px 0; }
     .legend i { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
-    canvas { width: 100%; height: 280px; background: #0c0c0c; border: 1px dashed #5a3038; border-radius: 12px; touch-action: none; }
+    canvas { width: 100%; height: 220px; background: #0c0c0c; border: 1px dashed #5a3038; border-radius: 12px; touch-action: none; }
+    .tools { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 8px 0; }
+    .wall {
+      position: relative; height: 220px; margin-top: 10px; border-radius: 12px; overflow: hidden;
+      background: linear-gradient(#6a5a52, #3e342f 40%, #2a2420);
+      box-shadow: inset 0 0 40px #0008;
+    }
+    .wall::before {
+      content: ""; position: absolute; inset: 0;
+      background-image: repeating-linear-gradient(90deg, rgba(0,0,0,.12) 0 8px, transparent 8px 18px);
+    }
+    .decal {
+      position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%) scale(var(--sc, 1));
+      width: 46%; height: 56%; object-fit: contain; pointer-events: none;
+      filter: blur(calc((1 - var(--near, .7)) * 2.2px));
+      opacity: calc(.45 + var(--near, .7) * .55);
+    }
+    .lbl { font-size: 12px; color: var(--muted); }
   </style>
 </head>
 <body>
@@ -284,11 +301,26 @@
       map: mapView,
       summon: () => `<div class="card"><p>استدعاء كامل لكل الأعضاء الأونلاين. علامة على خريطة اللعبة + GPS عند القبول.</p>
         <p class="hint">للملازم والرتب الأعلى.</p><button class="btn" data-act="summon">استدعاء العصابة كلها</button></div>`,
-      spray: () => `<div class="card"><p>وضعين: رسم حر أو كتابة. بدون رفع صور. الكلام الوسخ ينحجب.</p>
-        <button class="btn2" id="mfree">ارسم</button> <button class="btn2" id="mtext">اكتب</button>
+      spray: () => `<div class="card"><p>ارسم أو اكتب، غيّر اللون والخط، وبعدين عاين على الجدار: قرّب / صغّر / كبّر.</p>
+        <div class="tools">
+          <button class="btn2" id="mfree">ارسم</button>
+          <button class="btn2" id="mtext">اكتب</button>
+          <span class="lbl">لون</span>
+          ${['#e74c3c','#ffffff','#e2b039','#3498db','#27ae60','#9b59b6','#000000'].map(c=>`<button class="swatch" data-color="${c}" style="background:${c}"></button>`).join('')}
+          <span class="lbl">سُمك الخط</span>
+          <input id="brush" type="range" min="2" max="18" value="5" />
+        </div>
         <canvas id="cv" width="900" height="280"></canvas>
         <input class="inp hidden" id="stxt" placeholder="النص على الجدار" maxlength="28" />
-        <button class="btn" data-act="spray">بخ</button> <button class="btn2" data-act="cancel">إلغاء</button></div>`,
+        <div class="tools">
+          <span class="lbl">قرب للجدار</span>
+          <input id="near" type="range" min="20" max="100" value="70" />
+          <span class="lbl">تصغير / تكبير</span>
+          <input id="scale" type="range" min="40" max="160" value="100" />
+        </div>
+        <div class="wall"><img id="decal" class="decal" alt="" /></div>
+        <p class="hint">داخل اللعبة: سدّد على الجدار، سكرول للتكبير، قرّب شخصيتك للجدار عشان اللزقة تصير أوضح.</p>
+        <button class="btn" data-act="spray">بخ على الجدار</button> <button class="btn2" data-act="cancel">إلغاء</button></div>`,
       notifs: () => `<div class="log">استدعاء كامل من القائد — الآن</div>
         <div class="log">خصم بخ على أرضكم (قروف ستريت)</div>
         <div class="log">الأدمن وافق على أيقونة العصابة</div>
@@ -324,12 +356,33 @@
     };
     function bindSpray() {
       const cv = document.getElementById('cv'); if (!cv) return;
-      const ctx = cv.getContext('2d'); let draw = false;
-      cv.onpointerdown = e => { draw = true; const r = cv.getBoundingClientRect(); ctx.beginPath(); ctx.moveTo((e.clientX-r.left)*cv.width/r.width,(e.clientY-r.top)*cv.height/r.height); cv.setPointerCapture(e.pointerId); };
-      cv.onpointermove = e => { if (!draw) return; const r = cv.getBoundingClientRect(); ctx.strokeStyle = '#e74c3c'; ctx.lineWidth = 4; ctx.lineCap = 'round'; ctx.lineTo((e.clientX-r.left)*cv.width/r.width,(e.clientY-r.top)*cv.height/r.height); ctx.stroke(); };
-      cv.onpointerup = () => draw = false;
-      document.getElementById('mtext').onclick = () => document.getElementById('stxt').classList.remove('hidden');
-      document.getElementById('mfree').onclick = () => document.getElementById('stxt').classList.add('hidden');
+      const ctx = cv.getContext('2d');
+      ctx.fillStyle = '#0c0c0c'; ctx.fillRect(0,0,cv.width,cv.height);
+      let draw = false, color = '#e74c3c', width = 5;
+      const decal = document.getElementById('decal');
+      const sync = () => {
+        const near = (document.getElementById('near').value) / 100;
+        const sc = (document.getElementById('scale').value) / 100;
+        decal.style.setProperty('--near', near);
+        decal.style.setProperty('--sc', sc);
+        const txt = (document.getElementById('stxt').value || '').trim();
+        if (txt && !document.getElementById('stxt').classList.contains('hidden')) {
+          const t = document.createElement('canvas'); t.width = 400; t.height = 200;
+          const g = t.getContext('2d'); g.fillStyle = color; g.font = 'bold 64px Cairo, Tahoma'; g.textAlign = 'center'; g.fillText(txt, 200, 120);
+          decal.src = t.toDataURL();
+        } else decal.src = cv.toDataURL();
+      };
+      cv.onpointerdown = e => { draw = true; const r = cv.getBoundingClientRect(); ctx.beginPath(); ctx.strokeStyle = color; ctx.lineWidth = width; ctx.lineCap = 'round'; ctx.moveTo((e.clientX-r.left)*cv.width/r.width,(e.clientY-r.top)*cv.height/r.height); cv.setPointerCapture(e.pointerId); };
+      cv.onpointermove = e => { if (!draw) return; const r = cv.getBoundingClientRect(); ctx.strokeStyle = color; ctx.lineWidth = width; ctx.lineTo((e.clientX-r.left)*cv.width/r.width,(e.clientY-r.top)*cv.height/r.height); ctx.stroke(); sync(); };
+      cv.onpointerup = () => { draw = false; sync(); };
+      view.querySelectorAll('[data-color]').forEach(b => b.onclick = () => { color = b.getAttribute('data-color'); sync(); });
+      document.getElementById('brush').oninput = e => { width = Number(e.target.value); };
+      document.getElementById('near').oninput = sync;
+      document.getElementById('scale').oninput = sync;
+      document.getElementById('stxt').oninput = sync;
+      document.getElementById('mtext').onclick = () => { document.getElementById('stxt').classList.remove('hidden'); sync(); };
+      document.getElementById('mfree').onclick = () => { document.getElementById('stxt').classList.add('hidden'); document.getElementById('stxt').value = ''; sync(); };
+      sync();
     }
     function render() {
       title.textContent = (page==='admin' && inspectGang) ? ('إدارة · ' + inspectGang.name) : pages.find(p => p[0]===page)[1];
