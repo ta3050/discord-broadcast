@@ -20,17 +20,28 @@
     }
     .shell {
       width: min(1280px, 96vw); height: min(760px, 94vh); margin: 3vh auto;
-      display: grid; grid-template-columns: 1fr 228px;
+      display: grid; grid-template-columns: 1fr 228px; direction: ltr;
       background: linear-gradient(180deg, #16090d, var(--panel));
       border: 1px solid var(--line); border-radius: 22px; overflow: hidden;
       box-shadow: 0 30px 80px rgba(0,0,0,.55);
     }
+    .main, .side { direction: rtl; }
     .main { display: flex; flex-direction: column; min-width: 0; }
     .top { display: flex; align-items: center; justify-content: space-between; padding: 18px 24px 8px; }
     .brand { display: flex; align-items: center; gap: 10px; font-weight: 800; font-size: 22px; }
     .skull { width: 34px; height: 34px; border-radius: 10px; background: var(--red); display: grid; place-items: center; }
     .page-title { color: var(--muted); font-weight: 700; }
-    .side { background: #0c0608; border-right: 1px solid var(--line); padding: 14px 10px; overflow: auto; }
+    .side {
+      background: #0c0608; border-left: 1px solid var(--line); padding: 14px 8px 14px 6px;
+      overflow-y: auto; overflow-x: hidden;
+      scrollbar-width: thick; scrollbar-color: #c43b4a #1a0d12;
+    }
+    .side::-webkit-scrollbar { width: 14px; }
+    .side::-webkit-scrollbar-track { background: #1a0d12; border-radius: 8px; }
+    .side::-webkit-scrollbar-thumb { background: #c43b4a; border-radius: 8px; border: 2px solid #1a0d12; }
+    .content { scrollbar-width: thick; scrollbar-color: #c43b4a #1a0d12; }
+    .content::-webkit-scrollbar { width: 12px; }
+    .content::-webkit-scrollbar-thumb { background: #9a2b38; border-radius: 8px; }
     .nav {
       width: 100%; border: 0; background: transparent; color: #d7c4c8;
       display: flex; gap: 8px; padding: 10px 12px; border-radius: 10px;
