@@ -240,6 +240,35 @@
       </div>
       <p class="hint">خريطة لوس سانتوس: كل دائرة تيرف عصابة. اللون = العصابة المسيطرة. الفاضي بدون سيطرة.</p>`;
     }
+    let inspectGang = null;
+    function leaderBody(g) {
+      return `<div class="cards">
+          <div class="card">النقاط<b class="big">${g.xp}</b></div>
+          <div class="card">البخات<b class="big">${g.sprays}</b></div>
+          <div class="card">الترتيب<b class="big">#${g.place}</b></div>
+        </div>
+        <div class="grid2">
+        <div class="card"><b>المقر واللون</b>
+          <button class="btn" data-act="hq">تعيين المقر هنا</button>
+          <p class="hint">لون العصابة</p>
+          ${['#e74c3c','#27ae60','#3498db','#e2b039','#9b59b6'].map(c=>`<button class="swatch" style="background:${c}" data-act="color"></button>`).join(' ')}
+        </div>
+        <div class="card"><b>أيقونة الخريطة</b>
+          <select class="inp"><option>عصابة</option><option>جمجمة</option><option>تاج</option><option>سلاح</option></select>
+          <button class="btn" data-act="icon">طلب / اعتماد الأيقونة</button></div>
+        </div>
+        <div class="card"><b>أعضاء ${g.name}</b>
+          ${members.map(m=>`<div class="log">${m.name} · ${m.role}
+            <button class="btn2" data-act="up">ترقية</button>
+            <button class="btn2" data-act="down">تنزيل</button>
+            <button class="manage" data-act="kick">طرد</button></div>`).join('')}
+        </div>
+        <div class="card"><b>سجل بخ ${g.name}</b>
+          ${sprayLog.map((s,i) => sprayCard(s,i)).join('')}
+          <button class="btn no" data-act="wipe">مسح بخاخات هالعصابة</button>
+        </div>
+        <div class="card"><b>إعلان</b><input class="inp" placeholder="نص الإعلان" /><button class="btn" data-act="ann">إرسال</button></div>`;
+    }
     const views = {
       home: () => `<div class="cards">
           <div class="card">النقاط<b class="big">35135</b></div>
@@ -270,42 +299,28 @@
         <div class="log">أدمن · إنشاء عصابة · آل فخامة</div>
         <div class="log">قائد · استدعاء كامل</div>
         <div class="log">أدمن · قبول أيقونة</div></div>`,
-      leader: () => `<div class="grid2">
-        <div class="card"><b>المقر واللون</b><p class="hint">تعيين المقر على موقعك الحالي</p>
-          <button class="btn" data-act="hq">تعيين المقر هنا</button>
-          <p class="hint">لون العصابة</p>
-          ${['#e74c3c','#27ae60','#3498db','#e2b039','#9b59b6'].map(c=>`<button class="swatch" style="background:${c}" data-act="color"></button>`).join(' ')}
-        </div>
-        <div class="card"><b>أيقونة الخريطة</b><p class="hint">تختارها أنت، وما تظهر إلا بعد موافقة الإدارة</p>
-          <select class="inp"><option>عصابة</option><option>جمجمة</option><option>تاج</option><option>سلاح</option></select>
-          <button class="btn" data-act="icon">طلب الأيقونة</button></div>
-        </div>
-        <div class="card"><b>إعلان للأعضاء</b><input class="inp" placeholder="نص الإعلان" /><button class="btn" data-act="ann">إرسال</button></div>
-        <div class="card"><b>الأعضاء والرتب</b>
-          ${members.map(m=>`<div class="log">${m.name} · ${m.role}
-            <button class="btn2" data-act="up">ترقية</button>
-            <button class="btn2" data-act="down">تنزيل</button>
-            <button class="manage" data-act="kick">طرد</button></div>`).join('')}
-          <button class="btn no" data-act="wipe">مسح بخاخات العصابة</button>
-        </div>`,
-      admin: () => `<div class="grid2">
-        <div class="card"><b>إنشاء عصابة</b>
-          <input class="inp" placeholder="الاسم" /><input class="inp" placeholder="الوسم" />
+      leader: () => leaderBody(gangs[0]),
+      admin: () => inspectGang ? `<div class="card" style="display:flex;justify-content:space-between;align-items:center;gap:10px">
+            <div><b>وضع الليدر — ${inspectGang.name} [${inspectGang.tag}]</b><p class="hint">دخلت كإدارة: كل صلاحيات الليدر + حذف/تعيين ليدر</p></div>
+            <div>
+              <button class="btn2" data-act="backg">رجوع</button>
+              <button class="btn" data-act="setl">تعيين ليدر</button>
+              <button class="btn no" data-act="delg">حذف العصابة</button>
+            </div>
+          </div>${leaderBody(inspectGang)}`
+        : `<div class="card"><b>إنشاء عصابة</b>
+          <div class="grid2"><input class="inp" placeholder="الاسم" /><input class="inp" placeholder="الوسم" /></div>
           <button class="btn" data-act="create">إنشاء</button></div>
-        <div class="card"><b>تعديل عصابة</b>
-          <select class="inp">${gangs.map(g=>`<option>${g.name}</option>`).join('')}</select>
-          <input class="inp" placeholder="آيدي ليدر / عضو" />
-          <button class="btn" data-act="setl">تعيين ليدر</button>
-          <button class="btn2" data-act="addl">إضافة عضو</button>
-          <button class="btn no" data-act="delg">حذف العصابة</button></div>
-        </div>
-        <div class="card"><b>أيقونات معلّقة — موافقة الإدارة</b>
+        <p class="hint">دخول أي عصابة يفتح وضع الليدر كامل: أعضاء، بخ، نقاط، أيقونة، مقر، سجلات.</p>
+        ${gangs.map((g,i)=>`<div class="log spray-item">
+          <div class="spray-thumb wall-text" style="color:${g.color};font-size:16px">${g.tag}</div>
+          <div><b>${g.name}</b><div class="xp">ترتيب #${g.place} · نقاط ${g.xp} · بخات ${g.sprays}</div></div>
+          <button class="btn" data-act="enter" data-i="${i}">دخول</button>
+        </div>`).join('')}
+        <div class="card"><b>أيقونات معلّقة</b>
           <div class="log">آل فخامة: جمجمة → تاج
             <button class="btn ok" data-act="yes">موافقة</button>
-            <button class="btn no" data-act="no">رفض</button></div></div>
-        <div class="card"><b>كل البخاخات</b>
-          ${sprayLog.map((s,i) => sprayCard(s,i)).join('')}
-          <button class="btn no" data-act="wipeall">مسح كل البخاخات</button></div>`
+            <button class="btn no" data-act="no">رفض</button></div></div>`
     };
     function bindSpray() {
       const cv = document.getElementById('cv'); if (!cv) return;
@@ -317,7 +332,7 @@
       document.getElementById('mfree').onclick = () => document.getElementById('stxt').classList.add('hidden');
     }
     function render() {
-      title.textContent = pages.find(p => p[0]===page)[1];
+      title.textContent = (page==='admin' && inspectGang) ? ('إدارة · ' + inspectGang.name) : pages.find(p => p[0]===page)[1];
       search.classList.toggle('hidden', page !== 'members');
       renderNav();
       view.innerHTML = views[page]();
@@ -337,7 +352,8 @@
         else if (cv) sprayLog.unshift({ who: 'أنت', mode: 'draw', img: cv.toDataURL(), where: 'هنا', when: 'الآن' });
         page = 'logs'; render(); toast('انحفظ في السجل — الرسم أو الكتابة ظاهرة'); return;
       }
-      if (act === 'dels') { sprayLog.splice(Number(b.getAttribute('data-i') || 0), 1); render(); return; }
+      if (act === 'enter') { inspectGang = gangs[Number(b.getAttribute('data-i')||0)]; render(); return; }
+      if (act === 'backg') { inspectGang = null; render(); return; }
       toast('تم (هذا عرض شكل — يشتغل كامل داخل اللعبة)');
     });
     search.addEventListener('input', () => { if (page==='members') view.innerHTML = membersView(); });
