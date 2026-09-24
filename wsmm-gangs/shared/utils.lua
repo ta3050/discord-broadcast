@@ -12,20 +12,61 @@ function WGZoneHalf(z)
     return (z.size or z.radius or 90.0) + 0.0
 end
 
+function WGZoneList()
+    if type(WG) == 'table' and type(WG.AllZones) == 'function' then
+        local list = WG.AllZones()
+        if type(list) == 'table' then return list end
+    end
+    return Config.Zones
+end
+
+-- Percent box on html/los-santos-map.png → world center + square half-extent.
+function WGMapBoxToWorld(map)
+    if type(map) ~= 'table' then return nil end
+    local x = tonumber(map.x)
+    local y = tonumber(map.y)
+    local w = tonumber(map.w)
+    local h = tonumber(map.h or map.w)
+    if not x or not y or not w or not h then return nil end
+    w = math.max(1.5, math.min(40.0, w))
+    h = math.max(1.5, math.min(40.0, h))
+    x = math.max(0.0, math.min(99.0, x))
+    y = math.max(0.0, math.min(99.0, y))
+    if x + w > 100.0 then x = 100.0 - w end
+    if y + h > 100.0 then y = 100.0 - h end
+    local cx = x + w / 2.0
+    local cy = y + h / 2.0
+    local worldX = ((cx - 12.0) / 60.0) * 2950.0 - 1850.0
+    local worldY = 400.0 - ((cy - 12.0) / 70.0) * 3200.0
+    local sizeX = (w / 60.0) * 2950.0 / 2.0
+    local sizeY = (h / 70.0) * 3200.0 / 2.0
+    local size = math.max(40.0, math.min(400.0, math.max(sizeX, sizeY)))
+    return {
+        x = worldX,
+        y = worldY,
+        z = 30.0,
+        size = size,
+        map = { x = x, y = y, w = w, h = h }
+    }
+end
+
 -- Axis-aligned square (never a circle). Closest center wins if boxes overlap.
 function WGGetZoneAt(coords)
     if not coords then return nil end
     local x, y = coords.x or coords[1], coords.y or coords[2]
     local best, bestD = nil, nil
-    for i = 1, #Config.Zones do
-        local z = Config.Zones[i]
+    local list = WGZoneList()
+    for i = 1, #list do
+        local z = list[i]
         local c = z.coords
-        local half = WGZoneHalf(z)
-        local dx, dy = x - c.x, y - c.y
-        if math.abs(dx) <= half and math.abs(dy) <= half then
-            local d = dx * dx + dy * dy
-            if not bestD or d < bestD then
-                best, bestD = z, d
+        if c then
+            local half = WGZoneHalf(z)
+            local dx, dy = x - c.x, y - c.y
+            if math.abs(dx) <= half and math.abs(dy) <= half then
+                local d = dx * dx + dy * dy
+                if not bestD or d < bestD then
+                    best, bestD = z, d
+                end
             end
         end
     end

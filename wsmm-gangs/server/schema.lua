@@ -82,6 +82,21 @@ function WGEnsureSchema()
             open TINYINT NOT NULL DEFAULT 1
         )
     ]])
+    MySQL.query.await([[
+        CREATE TABLE IF NOT EXISTS wsmm_gang_custom_zones (
+            id VARCHAR(32) PRIMARY KEY,
+            label VARCHAR(64) NOT NULL,
+            x DOUBLE NOT NULL,
+            y DOUBLE NOT NULL,
+            z DOUBLE NOT NULL DEFAULT 30,
+            size DOUBLE NOT NULL DEFAULT 90,
+            map_x DOUBLE NOT NULL,
+            map_y DOUBLE NOT NULL,
+            map_w DOUBLE NOT NULL,
+            map_h DOUBLE NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ]])
     pcall(function()
         MySQL.query.await('ALTER TABLE wsmm_gangs ADD COLUMN icon_image MEDIUMTEXT NULL')
     end)

@@ -135,6 +135,12 @@
       max-width: 96%; overflow: hidden; text-overflow: ellipsis;
     }
     .turf.open .lab { display: none; }
+    .gta-map.drawing { cursor: crosshair; touch-action: none; }
+    .gta-map.drawing .turf, .gta-map.drawing .legend { pointer-events: none; }
+    .turf.draft {
+      border: 2px solid #e2b039; background: rgba(226,176,57,.32);
+      pointer-events: none; z-index: 5;
+    }
     .legend {
       position: absolute; left: 12px; bottom: 12px; background: #12080ccc;
       border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; z-index: 3;
@@ -226,6 +232,9 @@
       ['admin', 'قائمة الإدارة']
     ];
     let page = 'map';
+    let drawingZone = false;
+    let draftBox = null;
+    let zoneName = '';
     const nav = document.getElementById('nav');
     const view = document.getElementById('view');
     const title = document.getElementById('title');
@@ -317,7 +326,10 @@
     }
     function mapView() {
       const claimed = zones.filter(z => z.open && z.owner);
-      return `<div class="gta-map">
+      const draft = (drawingZone && draftBox && draftBox.w)
+        ? `<div class="turf draft" style="left:${draftBox.x}%;top:${draftBox.y}%;width:${draftBox.w}%;height:${draftBox.h}%"></div>`
+        : '';
+      return `<div class="gta-map${drawingZone?' drawing':''}">
         ${zones.map((z,i) => {
           if (!z.open) return '';
           const claimedZone = !!z.owner;
@@ -328,17 +340,25 @@
           return `<div class="${cls}" data-act="zone" data-i="${i}" style="${style}">
             ${claimedZone ? `<span class="lab">${z.owner}</span>` : ''}
           </div>`;
-        }).join('')}
+        }).join('')}${draft}
         ${claimed.length ? `<div class="legend"><b>مناطق العصابات</b>
           ${claimed.map(z => `<div><i style="background:${z.c}"></i> ${z.name} — ${z.owner}</div>`).join('')}
         </div>` : ''}
       </div>
-      <p class="hint">خريطة لوس سانتوس: المربع الملوّن = تيرف عصيبة. المتقطع = مفتوح فاضي. المقفول نظيف بدون رسم.</p>
-      <div class="card"><b>المناطق (فتح / قفل)</b>
+      <p class="hint">${drawingZone ? 'اكتب الاسم، بعدين اسحب مربع على الخريطة، وبعدين احفظ.' : 'خريطة لوس سانتوس: المربع الملوّن = تيرف عصيبة. المتقطع = مفتوح فاضي. المقفول نظيف بدون رسم.'}</p>
+      <div class="card"><b>المناطق (إنشاء / فتح / قفل)</b>
+        <p class="hint">الأدمن ينشئ منطقة بمربع على الخريطة، ويفتح أو يقفل المطالبة.</p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin:8px 0"><button class="btn" data-act="newz">إنشاء منطقة</button></div>
+        ${drawingZone ? `<input class="inp" id="zone-name" maxlength="32" placeholder="اسم المنطقة" value="${zoneName.replace(/"/g,'&quot;')}"/>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin:8px 0">
+            <button class="btn" data-act="savez">حفظ المنطقة</button>
+            <button class="btn2" data-act="cancelz">إلغاء الرسم</button>
+          </div>` : ''}
         ${zones.map((z,i)=>`<div class="log" style="display:flex;justify-content:space-between;gap:8px;align-items:center">
-          <div><b>${z.name}</b> · ${z.owner || 'فاضي'} · ${z.open?'مفتوحة للمطالبة':'مقفلة'}</div>
+          <div><b>${z.name}</b> · ${z.owner || 'فاضي'} · ${z.open?'مفتوحة للمطالبة':'مقفلة'}${z.custom?' · مخصصة':''}</div>
           <div>
             <button class="btn2" data-act="togglez" data-i="${i}">${z.open?'قفل':'فتح'}</button>
+            ${z.custom ? `<button class="btn no" data-act="delz" data-i="${i}">حذف المنطقة</button>` : ''}
           </div>
         </div>`).join('')}
       </div>`;
@@ -435,6 +455,9 @@
         : `<div class="card"><b>إنشاء عصابة</b>
           <div class="grid2"><input class="inp" placeholder="الاسم" /><input class="inp" placeholder="الوسم" /></div>
           <button class="btn" data-act="create">إنشاء</button></div>
+        <div class="card"><b>إنشاء منطقة</b>
+          <p class="hint">ارسم مربعها على خريطة لوس سانتوس من الإدارة.</p>
+          <button class="btn" data-act="newz">إنشاء منطقة</button></div>
         <p class="hint">دخول أي عصابة يفتح وضع الليدر كامل: أعضاء، بخ، نقاط، أيقونة، مقر، سجلات.</p>
         ${gangs.map((g,i)=>`<div class="log spray-item">
           <div class="spray-thumb wall-text" style="color:${g.color};font-size:16px">${g.tag}</div>
@@ -451,6 +474,55 @@
             </div>
           </div></div>`
     };
+
+    function bindZoneDraw() {
+      const inp = document.getElementById('zone-name');
+      if (inp) {
+        inp.value = zoneName || '';
+        inp.oninput = () => { zoneName = inp.value; };
+      }
+      const map = document.querySelector('.gta-map');
+      if (!map || !drawingZone) return;
+      map.classList.add('drawing');
+      let draft = map.querySelector('.turf.draft');
+      if (!draft) {
+        draft = document.createElement('div');
+        draft.className = 'turf draft';
+        map.appendChild(draft);
+      }
+      const apply = (box) => {
+        if (!box) return;
+        draft.style.left = box.x + '%';
+        draft.style.top = box.y + '%';
+        draft.style.width = box.w + '%';
+        draft.style.height = box.h + '%';
+      };
+      if (draftBox) apply(draftBox);
+      const pct = (e) => {
+        const r = map.getBoundingClientRect();
+        return {
+          x: Math.min(100, Math.max(0, ((e.clientX - r.left) / r.width) * 100)),
+          y: Math.min(100, Math.max(0, ((e.clientY - r.top) / r.height) * 100))
+        };
+      };
+      const boxFrom = (a, b) => {
+        const x = Math.min(a.x, b.x), y = Math.min(a.y, b.y);
+        return { x, y, w: Math.abs(a.x - b.x), h: Math.abs(a.y - b.y) };
+      };
+      let start = null;
+      map.onpointerdown = (e) => {
+        if (e.button != null && e.button !== 0) return;
+        start = pct(e);
+        map.setPointerCapture(e.pointerId);
+        e.preventDefault();
+      };
+      map.onpointermove = (e) => {
+        if (!start) return;
+        draftBox = boxFrom(start, pct(e));
+        apply(draftBox);
+      };
+      map.onpointerup = () => { start = null; };
+    }
     function bindSpray() {
       const cv = document.getElementById('cv'); if (!cv) return;
       const ctx = cv.getContext('2d');
@@ -489,6 +561,7 @@
       bindSideRail();
       requestAnimationFrame(syncRail);
       if (page === 'spray') bindSpray();
+      bindZoneDraw();
       const iconfile = document.getElementById('iconfile');
       if (iconfile) iconfile.onchange = () => {
         const file = iconfile.files && iconfile.files[0]; if (!file) return;
@@ -523,6 +596,22 @@
       if (act === 'enter') { inspectGang = gangs[Number(b.getAttribute('data-i')||0)]; render(); return; }
       if (act === 'togglez') { const z = zones[Number(b.getAttribute('data-i')||0)]; z.open = !z.open; if (!z.open) z.owner = ''; render(); return; }
       if (act === 'clearz') { const z = zones[Number(b.getAttribute('data-i')||0)]; z.owner = ''; render(); return; }
+      if (act === 'newz') { drawingZone = true; page = 'map'; render(); return; }
+      if (act === 'cancelz') { drawingZone = false; draftBox = null; zoneName = ''; render(); return; }
+      if (act === 'savez') {
+        const inp = document.getElementById('zone-name');
+        zoneName = ((inp && inp.value) || zoneName || '').trim();
+        if (!zoneName) { toast('اكتب اسم المنطقة.'); return; }
+        if (!draftBox || draftBox.w < 1.5 || draftBox.h < 1.5) { toast('حدد المربع على الخريطة أولاً.'); return; }
+        zones.push({ name: zoneName, owner: '', open: true, custom: true, c: '#e2b039', l: draftBox.x, t: draftBox.y, w: draftBox.w, h: draftBox.h });
+        drawingZone = false; draftBox = null; zoneName = '';
+        render(); toast('انشئت المنطقة.'); return;
+      }
+      if (act === 'delz') {
+        const i = Number(b.getAttribute('data-i')||0);
+        if (zones[i] && zones[i].custom) zones.splice(i, 1);
+        render(); toast('انحذفت المنطقة.'); return;
+      }
       if (act === 'backg') { inspectGang = null; render(); return; }
       toast('تم (هذا عرض شكل — يشتغل كامل داخل اللعبة)');
     });

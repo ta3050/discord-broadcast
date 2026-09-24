@@ -120,9 +120,50 @@ function WG.Reload()
     end
 end
 
+function WG.LoadCustomZones()
+    WG.CustomZones = {}
+    local rows = MySQL.query.await('SELECT * FROM wsmm_gang_custom_zones') or {}
+    for _, r in ipairs(rows) do
+        WG.CustomZones[#WG.CustomZones + 1] = {
+            id = r.id,
+            label = { ar = r.label, en = r.label },
+            coords = { x = r.x + 0.0, y = r.y + 0.0, z = (r.z or 30.0) + 0.0 },
+            size = (r.size or 90.0) + 0.0,
+            map = { x = r.map_x + 0.0, y = r.map_y + 0.0, w = r.map_w + 0.0, h = r.map_h + 0.0 },
+            custom = true
+        }
+    end
+end
+
+function WG.AllZones()
+    local out = {}
+    for i = 1, #Config.Zones do
+        out[#out + 1] = Config.Zones[i]
+    end
+    for i = 1, #(WG.CustomZones or {}) do
+        out[#out + 1] = WG.CustomZones[i]
+    end
+    return out
+end
+
+function WG.NewZoneId()
+    for _ = 1, 12 do
+        local id = ('cz_%x'):format(math.random(0x100000, 0xffffff))
+        local taken = WG.ZoneState[id]
+        if not taken then
+            for _, z in ipairs(WG.AllZones()) do
+                if z.id == id then taken = true break end
+            end
+        end
+        if not taken then return id end
+    end
+    return ('cz_%d'):format(os.time() % 99999999)
+end
+
 function WG.LoadZones()
+    WG.LoadCustomZones()
     WG.ZoneState = {}
-    for _, z in ipairs(Config.Zones) do
+    for _, z in ipairs(WG.AllZones()) do
         WG.ZoneState[z.id] = { owner_gang_id = nil, scores = {}, open = 1 }
     end
     for _, r in ipairs(MySQL.query.await('SELECT * FROM wsmm_gang_zone_state') or {}) do
@@ -256,8 +297,9 @@ end
 
 function WG.Places(lang)
     local out = {}
-    for i = 1, #Config.Zones do
-        local z = Config.Zones[i]
+    local list = WG.AllZones()
+    for i = 1, #list do
+        local z = list[i]
         local st = WG.ZoneState[z.id] or { open = 1 }
         local open = st.open ~= 0
         local owner = st.owner_gang_id and WG.Gangs[st.owner_gang_id]
@@ -276,6 +318,7 @@ function WG.Places(lang)
             map = z.map,
             open = open,
             claimed = owner ~= nil,
+            custom = z.custom == true,
             influence = st.scores or {}
         }
     end
@@ -314,8 +357,9 @@ end
 
 local function publicBlips()
     local turfs = {}
-    for i = 1, #Config.Zones do
-        local z = Config.Zones[i]
+    local list = WG.AllZones()
+    for i = 1, #list do
+        local z = list[i]
         local st = WG.ZoneState[z.id] or {}
         if st.open ~= 0 then
             local owner = st.owner_gang_id and WG.Gangs[st.owner_gang_id]
@@ -802,6 +846,52 @@ RegisterNetEvent('wsmm_gangs:action', function(action, data)
         WG.SaveZone(zoneId)
         WG.LogActivity(src, nil, open == 1 and 'zone_open' or 'zone_lock', zoneId)
         WG.Notify(src, open == 1 and 'zone_opened' or 'zone_locked')
+        WG.RefreshBlipsAll()
+
+    elseif action == 'createZone' then
+        if not admin then return WG.Notify(src, 'not_admin') end
+        local label = tostring(data.label or data.name or ''):gsub('^%s+', ''):gsub('%s+$', '')
+        if label == '' or #label > 64 then
+            return WG.Notify(src, 'zone_need_name')
+        end
+        if WGBanned(label) then
+            return WG.Notify(src, 'banned_text')
+        end
+        if #(WG.CustomZones or {}) >= 40 then
+            return WG.Notify(src, 'zone_limit')
+        end
+        local world = WGMapBoxToWorld(data.map)
+        if not world then
+            return WG.Notify(src, 'zone_need_box')
+        end
+        local id = WG.NewZoneId()
+        MySQL.insert.await(
+            'INSERT INTO wsmm_gang_custom_zones (id, label, x, y, z, size, map_x, map_y, map_w, map_h) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            {
+                id, label, world.x, world.y, world.z, world.size,
+                world.map.x, world.map.y, world.map.w, world.map.h
+            }
+        )
+        WG.LoadCustomZones()
+        WG.ZoneState[id] = { owner_gang_id = nil, scores = {}, open = 1 }
+        WG.SaveZone(id)
+        WG.LogActivity(src, nil, 'zone_create', label)
+        WG.Notify(src, 'zone_created')
+        WG.RefreshBlipsAll()
+
+    elseif action == 'deleteZone' then
+        if not admin then return WG.Notify(src, 'not_admin') end
+        local zoneId = tostring(data.zoneId or '')
+        local custom = false
+        for _, z in ipairs(WG.CustomZones or {}) do
+            if z.id == zoneId then custom = true break end
+        end
+        if not custom then return end
+        MySQL.update.await('DELETE FROM wsmm_gang_custom_zones WHERE id = ?', { zoneId })
+        MySQL.update.await('DELETE FROM wsmm_gang_zone_state WHERE zone_id = ?', { zoneId })
+        WG.LoadZones()
+        WG.LogActivity(src, nil, 'zone_delete', zoneId)
+        WG.Notify(src, 'zone_deleted')
         WG.RefreshBlipsAll()
     end
 end)

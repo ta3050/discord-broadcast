@@ -88,7 +88,8 @@ Config.IconUpload = {
 
 -- Tablet PNG is Los Santos city (html/los-santos-map.png). `map` is percent box on that image.
 -- `size` is half-extent in meters for in-game SQUARE detection + pause-map area blips (never circles).
--- Sandy / Paleto stay in-game only (off this city map). Admin can open/lock claimable zones.
+-- Sandy / Paleto stay in-game only (off this city map). Admin can open/lock claimable zones,
+-- and draw extra custom squares on the tablet map (stored in wsmm_gang_custom_zones).
 Config.Zones = {
     { id = 'grove',       label = { ar = 'قروف ستريت', en = 'Grove Street' },       coords = vector3(-132.4, -1609.2, 32.0),  size = 95.0,  map = { x = 46.5, y = 55.5, w = 6.4, h = 6.2 } },
     { id = 'chamberlain', label = { ar = 'تشامبرلين', en = 'Chamberlain Hills' },   coords = vector3(-220.0, -1490.0, 31.0),  size = 90.0,  map = { x = 41.8, y = 51.8, w = 5.6, h = 5.6 } },

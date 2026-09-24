@@ -66,6 +66,7 @@ Tablet map uses the real **Los Santos** image (`html/los-santos-map.png`). Terri
 - **Claimed** (and open): colored square + gang name.
 - **Open unclaimed**: faint dashed square only — the map stays clean (no colored blob).
 - **Locked**: no overlay. Admin opens/locks which zones gangs may claim.
+- **Create zone**: admin button **إنشاء منطقة** — name the zone, drag a square on the tablet map, save. Custom squares persist in the database (defaults stay in `config.lua`). Admin can delete custom zones only.
 
 In-game pause map uses `AddBlipForArea` squares for claimed open turf. GTA cannot paint a custom PNG onto pause-map blips without a streamed texture dictionary, so those stay default sprites. Uploaded gang images show on the **tablet map** after admin approval.
 

@@ -13,6 +13,8 @@ function t(k) {
 
 function $(id) { return document.getElementById(id); }
 
+let zoneDraw = { active: false, box: null, name: '' };
+
 function post(name, data) {
   if (MOCK) {
     if (name === 'action' && data && data.a === 'setZoneOpen') {
@@ -21,6 +23,28 @@ function post(name, data) {
         z.open = Number(data.open) === 1;
         render();
       }
+    }
+    if (name === 'action' && data && data.a === 'createZone') {
+      const box = data.map || {};
+      if ((data.label || '').trim() && box.w >= 1.5 && box.h >= 1.5) {
+        S.places = S.places || [];
+        S.places.push({
+          id: 'cz_' + Date.now().toString(16),
+          label: String(data.label).trim(),
+          owner: null,
+          claimed: false,
+          open: true,
+          custom: true,
+          map: { x: box.x, y: box.y, w: box.w, h: box.h }
+        });
+        toast(t('zone_created'));
+        render();
+      }
+    }
+    if (name === 'action' && data && data.a === 'deleteZone') {
+      S.places = (S.places || []).filter((p) => !(p.custom && p.id === data.zoneId));
+      toast(t('zone_deleted'));
+      render();
     }
     console.log(name, data);
     return Promise.resolve({ ok: true });
@@ -239,28 +263,125 @@ function mapView() {
         ${claimedZone ? `<span class="lab">${esc(z.owner)}</span>` : ''}
       </div>`;
   }).join('');
-  return `<div class="gta-map">${boxes}
+  const draft = (S.isAdmin && zoneDraw.active && zoneDraw.box && zoneDraw.box.w)
+    ? `<div class="turf draft" style="left:${zoneDraw.box.x}%;top:${zoneDraw.box.y}%;width:${zoneDraw.box.w}%;height:${zoneDraw.box.h}%"></div>`
+    : '';
+  return `<div class="gta-map${S.isAdmin && zoneDraw.active ? ' drawing' : ''}">${boxes}${draft}
       ${claimed.length ? `<div class="legend"><b>${t('map_legend')}</b>
         ${claimed.map((z) => `<div><i style="background:${z.hex || colorHex(z.color)}"></i> ${esc(z.label)} — ${esc(z.owner)}</div>`).join('')}
       </div>` : ''}
     </div>
-    <p class="hint">${t('map_hint')}</p>
+    <p class="hint">${zoneDraw.active ? t('zone_draw_hint') : t('map_hint')}</p>
     ${S.isAdmin ? zoneAdmin() : ''}`;
 }
 
 function zoneAdmin() {
+  if (!S.isAdmin) return '';
   const zones = S.places || [];
-  if (!zones.length) return '';
   return `<div class="card"><b>${t('zones_admin')}</b>
     <p class="hint">${t('map_open_hint')}</p>
+    <div class="row">
+      <button class="btn" id="zone-create" type="button">${t('create_zone')}</button>
+    </div>
+    ${zoneDraw.active ? `<input class="inp" id="zone-name" maxlength="32" placeholder="${t('zone_name')}" value="${esc(zoneDraw.name)}"/>
+      <p class="hint">${t('zone_draw_hint')}</p>
+      <div class="row">
+        <button class="btn" id="zone-save" type="button">${t('zone_save')}</button>
+        <button class="btn2" id="zone-cancel-draw" type="button">${t('zone_cancel')}</button>
+      </div>` : ''}
     ${zones.map((z) => `<div class="log">
       <b>${esc(z.label)}</b>
-      <span class="xp">${z.open === false ? t('zone_locked_state') : t('zone_open_state')}${z.owner ? ' · ' + esc(z.owner) : ''}</span>
+      <span class="xp">${z.open === false ? t('zone_locked_state') : t('zone_open_state')}${z.owner ? ' · ' + esc(z.owner) : ''}${z.custom ? ' · ' + t('create_zone') : ''}</span>
       ${z.open === false
         ? `<button class="btn ok" data-act='{"a":"setZoneOpen","zoneId":"${esc(z.id)}","open":1}'>${t('zone_open')}</button>`
         : `<button class="btn2" data-act='{"a":"setZoneOpen","zoneId":"${esc(z.id)}","open":0}'>${t('zone_lock')}</button>`}
+      ${z.custom ? `<button class="btn no" data-act='{"a":"deleteZone","zoneId":"${esc(z.id)}"}'>${t('delete_zone')}</button>` : ''}
     </div>`).join('')}
   </div>`;
+}
+
+function startZoneDraw() {
+  zoneDraw.active = true;
+  page = 'map';
+  render();
+}
+
+function cancelZoneDraw() {
+  zoneDraw = { active: false, box: null, name: '' };
+  render();
+}
+
+function saveZoneDraw() {
+  const nameEl = $('zone-name');
+  const name = ((nameEl && nameEl.value) || zoneDraw.name || '').trim();
+  zoneDraw.name = name;
+  if (!name) {
+    toast(t('zone_need_name'));
+    return;
+  }
+  const box = zoneDraw.box;
+  if (!box || box.w < 1.5 || box.h < 1.5) {
+    toast(t('zone_need_box'));
+    return;
+  }
+  const payload = { a: 'createZone', label: name, map: { x: box.x, y: box.y, w: box.w, h: box.h } };
+  zoneDraw = { active: false, box: null, name: '' };
+  post('action', payload);
+  if (!MOCK) setTimeout(() => post('refresh'), 250);
+}
+
+function bindZoneDraw() {
+  const nameEl = $('zone-name');
+  if (nameEl) {
+    nameEl.value = zoneDraw.name || '';
+    nameEl.oninput = () => { zoneDraw.name = nameEl.value; };
+  }
+  const map = document.querySelector('.gta-map');
+  if (!map || !zoneDraw.active || !S.isAdmin) return;
+  map.classList.add('drawing');
+  let draft = map.querySelector('.turf.draft');
+  if (!draft) {
+    draft = document.createElement('div');
+    draft.className = 'turf draft';
+    map.appendChild(draft);
+  }
+  const apply = (box) => {
+    if (!box) return;
+    draft.style.left = box.x + '%';
+    draft.style.top = box.y + '%';
+    draft.style.width = box.w + '%';
+    draft.style.height = box.h + '%';
+    draft.hidden = false;
+  };
+  if (zoneDraw.box) apply(zoneDraw.box);
+  const pct = (e) => {
+    const r = map.getBoundingClientRect();
+    return {
+      x: Math.min(100, Math.max(0, ((e.clientX - r.left) / r.width) * 100)),
+      y: Math.min(100, Math.max(0, ((e.clientY - r.top) / r.height) * 100))
+    };
+  };
+  const boxFrom = (a, b) => {
+    const x = Math.min(a.x, b.x);
+    const y = Math.min(a.y, b.y);
+    return { x, y, w: Math.abs(a.x - b.x), h: Math.abs(a.y - b.y) };
+  };
+  let start = null;
+  map.onpointerdown = (e) => {
+    if (e.button != null && e.button !== 0) return;
+    start = pct(e);
+    map.setPointerCapture(e.pointerId);
+    e.preventDefault();
+  };
+  map.onpointermove = (e) => {
+    if (!start) return;
+    zoneDraw.box = boxFrom(start, pct(e));
+    apply(zoneDraw.box);
+  };
+  map.onpointerup = () => {
+    if (!start) return;
+    start = null;
+  };
 }
 
 function places() { return mapView(); }
@@ -581,6 +702,7 @@ function render() {
   $('page').innerHTML = (views[page] || home)();
   if (page === 'spray') bindSprayPage();
   bindIconUpload();
+  bindZoneDraw();
   bindSideRail();
   requestAnimationFrame(syncRail);
 }
@@ -627,6 +749,18 @@ $('page').onclick = (e) => {
   if (b) {
     post('action', JSON.parse(b.getAttribute('data-act')));
     setTimeout(() => post('refresh'), 250);
+    return;
+  }
+  if (e.target.id === 'zone-create') {
+    startZoneDraw();
+    return;
+  }
+  if (e.target.id === 'zone-save') {
+    saveZoneDraw();
+    return;
+  }
+  if (e.target.id === 'zone-cancel-draw') {
+    cancelZoneDraw();
     return;
   }
   if (e.target.id === 'icon-upload') {
@@ -774,8 +908,19 @@ if (MOCK) {
     guest: 'الدعوات', logs: 'السجلات', sprays: 'البخات', place: 'الترتيب',
     notifs: 'التنويهات',     map_legend: 'مناطق العصابات',
     map_hint: 'خريطة لوس سانتوس: المربع الملوّن = تيرف عصيبة. المتقطع = مفتوح فاضي. المقفول نظيف بدون رسم.',
-    map_open_hint: 'الأدمن يفتح أو يقفل المطالبة. المقفول ما ينرسم على الخريطة وما ينأخذ.',
-    zones_admin: 'المناطق (فتح / قفل)',
+    map_open_hint: 'الأدمن ينشئ منطقة بمربع على الخريطة، ويفتح أو يقفل المطالبة. المقفول ما ينرسم وما ينأخذ.',
+    zones_admin: 'المناطق (إنشاء / فتح / قفل)',
+    create_zone: 'إنشاء منطقة',
+    zone_name: 'اسم المنطقة',
+    zone_draw_hint: 'اكتب الاسم، بعدين اسحب مربع على خريطة لوس سانتوس، وبعدين احفظ.',
+    zone_save: 'حفظ المنطقة',
+    zone_cancel: 'إلغاء الرسم',
+    zone_need_box: 'حدد المربع على الخريطة أولاً.',
+    zone_need_name: 'اكتب اسم المنطقة.',
+    zone_created: 'انشئت المنطقة.',
+    zone_deleted: 'انحذفت المنطقة.',
+    zone_limit: 'وصلت حد المناطق المخصصة.',
+    delete_zone: 'حذف المنطقة',
     zone_open: 'فتح', zone_lock: 'قفل',
     zone_open_state: 'مفتوحة للمطالبة', zone_locked_state: 'مقفلة',
     spray_hint: 'وضعين: رسم حر أو كتابة. بدون رفع صور. الكلام الوسخ ينحجب.',
