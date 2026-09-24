@@ -145,6 +145,17 @@ function WG.LogActivity(src, gangId, action, detail)
     )
 end
 
+function WG.PushNotif(gangId, ntype, key, detail)
+    if not gangId then return end
+    MySQL.insert.await(
+        'INSERT INTO wsmm_gang_notifications (gang_id, type, title, message) VALUES (?, ?, ?, ?)',
+        { gangId, ntype or 'info', key or '', tostring(detail or ''):sub(1, 180) }
+    )
+    MySQL.update.await(
+        'DELETE FROM wsmm_gang_notifications WHERE created_at < DATE_SUB(NOW(), INTERVAL 7 DAY)'
+    )
+end
+
 function WG.NotifyLeaders(gangId, key)
     for ident, m in pairs(WG.Members) do
         if m.gang_id == gangId and WG.IsLeader(m) then
@@ -198,12 +209,17 @@ function WG.Places(lang)
         local z = Config.Zones[i]
         local st = WG.ZoneState[z.id] or {}
         local owner = st.owner_gang_id and WG.Gangs[st.owner_gang_id]
+        local col = owner and WGColor(owner.color) or nil
         out[#out + 1] = {
             id = z.id,
             label = WGLabel(z.label, lang),
             owner = owner and owner.label or nil,
             color = owner and owner.color or nil,
+            hex = col and col.hex or '#8d9199',
             icon = owner and owner.icon or nil,
+            x = z.coords.x,
+            y = z.coords.y,
+            radius = z.radius,
             influence = st.scores or {}
         }
     end
@@ -331,6 +347,7 @@ function WG.BuildTablet(src, lang)
         guests = {},
         sprayLog = nil,
         activityLog = nil,
+        notifs = {},
         adminSprays = nil,
         pendingIcons = nil,
         gangs = nil,
@@ -356,6 +373,10 @@ function WG.BuildTablet(src, lang)
         for _, m in ipairs(payload.members) do
             if m.guest then payload.guests[#payload.guests + 1] = m end
         end
+        payload.notifs = MySQL.query.await(
+            'SELECT id, type, title, message, created_at FROM wsmm_gang_notifications WHERE gang_id = ? ORDER BY id DESC LIMIT 30',
+            { gang.id }
+        ) or {}
     end
     if isLeader and gang then
         payload.sprayLog = MySQL.query.await(
@@ -465,6 +486,7 @@ RegisterNetEvent('wsmm_gangs:action', function(action, data)
             end
         end
         WG.LogActivity(src, gang.id, 'summon', payload.caller)
+        WG.PushNotif(gang.id, 'summon', 'summon_banner', payload.caller)
         WG.Notify(src, 'summon_sent')
 
     elseif action == 'inviteGuest' then
@@ -500,6 +522,7 @@ RegisterNetEvent('wsmm_gangs:action', function(action, data)
         local msg = tostring(data.text or ''):sub(1, 120)
         if msg == '' or WGBanned(msg) then return WG.Notify(src, 'banned_text') end
         WG.LogActivity(src, gang.id, 'announce', msg)
+        WG.PushNotif(gang.id, 'announce', 'announce', msg)
 
     elseif action == 'setHQ' then
         if not WG.IsLeader(member) then return WG.Notify(src, 'not_leader') end
@@ -667,6 +690,7 @@ RegisterNetEvent('wsmm_gangs:action', function(action, data)
         MySQL.update.await('UPDATE wsmm_gangs SET icon = pending_icon, pending_icon = NULL WHERE id = ?', { gid })
         WG.Reload()
         WG.LogActivity(src, gid, 'icon_approve', iconId)
+        WG.PushNotif(gid, 'icon', 'icon_approved', iconId)
         WG.NotifyLeaders(gid, 'icon_approved')
         WG.RefreshBlipsAll()
 
@@ -678,6 +702,7 @@ RegisterNetEvent('wsmm_gangs:action', function(action, data)
         MySQL.update.await('UPDATE wsmm_gangs SET pending_icon = NULL WHERE id = ?', { gid })
         WG.Reload()
         WG.LogActivity(src, gid, 'icon_reject', g.icon or Config.DefaultIcon)
+        WG.PushNotif(gid, 'icon', 'icon_rejected', g.icon or Config.DefaultIcon)
         WG.NotifyLeaders(gid, 'icon_rejected')
 
     elseif action == 'wipeAllSprays' then

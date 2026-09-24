@@ -30,8 +30,8 @@ Locales['en'] = {
     clear_leader = 'Remove leader',
     rival_spray = 'A rival tagged your turf.',
     spray_log = 'Spray log',
-    leader = 'Leader',
-    admin = 'Admin',
+    leader = 'Leader menu',
+    admin = 'Admin menu',
     spray = 'Spray',
     online = 'Online',
     offline = 'Offline',
@@ -130,5 +130,10 @@ Locales['en'] = {
     act_guest_remove = 'Removed guest',
     act_announce = 'Announcement',
     turf_public = 'Public turf',
-    hq_private = 'Private HQ'
+    hq_private = 'Private HQ',
+    map_legend = 'Gang territories',
+    map_hint = 'Los Santos map: each circle is gang turf. Color = the gang in control. Empty means unclaimed.',
+    spray_hint = 'Two modes: freehand or typed text. No image uploads. Dirty language is blocked.',
+    spray_wall_hint = 'Real spray is on a wall with the spray can. This page is practice inside the tablet.',
+    logs_only = 'Logs are for the leader and admins only.'
 }

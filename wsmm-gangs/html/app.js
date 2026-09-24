@@ -46,8 +46,10 @@ function navItems() {
     ['members', 'members'],
     ['guest', 'guest'],
     ['rankings', 'rankings'],
-    ['places', 'places'],
-    ['summon', 'summon']
+    ['map', 'places'],
+    ['summon', 'summon'],
+    ['spray', 'spray'],
+    ['notifs', 'notifs']
   ];
   if (S.isLeader || S.isAdmin) items.push(['logs', 'logs']);
   if (S.isLeader) items.push(['leader', 'leader']);
@@ -57,7 +59,8 @@ function navItems() {
 
 const NAV_ICONS = {
   home: '👥', members: '👤', guest: '✉', rankings: '🏆',
-  places: '🗺', summon: '📢', logs: '📋', leader: '⚙', admin: '🛡'
+  map: '🗺', summon: '📢', spray: '🎨', notifs: '🔔',
+  logs: '📋', leader: '⚙', admin: '🛡'
 };
 
 function renderNav() {
@@ -85,7 +88,8 @@ function iconLabel(id) {
 function pageTitle() {
   const map = {
     home: 'home', members: 'members', guest: 'guest', rankings: 'rankings',
-    places: 'places', summon: 'summon', logs: 'logs', leader: 'leader', admin: 'admin'
+    map: 'places', places: 'places', summon: 'summon', spray: 'spray',
+    notifs: 'notifs', logs: 'logs', leader: 'leader', admin: 'admin'
   };
   return t(map[page] || 'home');
 }
@@ -95,9 +99,9 @@ function home() {
   if (!g) return `<div class="card">${t('not_member')}</div>`;
   const rank = (S.rankings || []).findIndex((x) => x.id === g.id);
   return `<div class="cards">
-      <div class="card">${t('points')}<b>${g.points || 0}</b></div>
-      <div class="card">${t('sprays')}<b>${g.sprays || 0}</b></div>
-      <div class="card">${t('place')}<b>#${rank >= 0 ? rank + 1 : '—'}</b></div>
+      <div class="card">${t('points')}<b class="big">${g.points || 0}</b></div>
+      <div class="card">${t('sprays')}<b class="big">${g.sprays || 0}</b></div>
+      <div class="card">${t('place')}<b class="big">#${rank >= 0 ? rank + 1 : '—'}</b></div>
     </div>
     <div class="card">${esc(g.label)} <span class="tag">[${esc(g.tag || '')}]</span>
       <div class="xp">${t('color')}: ${esc(g.color || '')}
@@ -106,12 +110,44 @@ function home() {
     </div>`;
 }
 
-function places() {
+function hexRgba(hex, a) {
+  const h = String(hex || '#8d9199').replace('#', '');
+  const n = parseInt(h.length === 3 ? h.split('').map((c) => c + c).join('') : h, 16);
+  if (Number.isNaN(n)) return `rgba(141,145,153,${a})`;
+  return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`;
+}
+
+function mapPos(x, y, radius) {
+  const left = 8 + ((Number(x) + 3200) / 7400) * 84;
+  const top = 10 + (1 - (Number(y) + 3800) / 11200) * 80;
+  const size = Math.max(64, Math.min(124, 56 + (Number(radius) || 90) * 0.3));
+  return { left, top, size };
+}
+
+function mapView() {
   const zones = S.places || [];
   if (!zones.length) return `<div class="card">${t('none')}</div>`;
-  return `<div class="zones">${zones.map((z) => `<div class="zone"><b>${esc(z.label)}</b>
-    <div class="xp">${t('owner')}: ${esc(z.owner || t('none'))}</div></div>`).join('')}</div>`;
+  return `<div class="gta-map">
+      <div class="land"></div>
+      <div class="road" style="left:18%;top:46%;width:62%;height:6px;--r:-8deg"></div>
+      <div class="road" style="left:40%;top:18%;width:6px;height:64%;--r:6deg"></div>
+      <div class="road" style="left:22%;top:62%;width:50%;height:5px;--r:12deg"></div>
+      ${zones.map((z) => {
+        const p = mapPos(z.x, z.y, z.radius);
+        const c = z.hex || colorHex(z.color);
+        return `<div class="turf" style="left:${p.left}%;top:${p.top}%;width:${p.size}px;height:${p.size}px;border-color:${c};background:${hexRgba(c, 0.28)};box-shadow:0 0 18px ${hexRgba(c, 0.45)}">
+          <span class="dot" style="background:${c}"></span>
+          <span class="lab">${esc(z.label)}<br><span class="tag">${esc(z.owner || t('none'))}</span></span>
+        </div>`;
+      }).join('')}
+      <div class="legend"><b>${t('map_legend')}</b>
+        ${zones.map((z) => `<div><i style="background:${z.hex || colorHex(z.color)}"></i> ${esc(z.label)} — ${esc(z.owner || t('none'))}</div>`).join('')}
+      </div>
+    </div>
+    <p class="hint">${t('map_hint')}</p>`;
 }
+
+function places() { return mapView(); }
 
 function rankings() {
   const list = S.rankings || [];
@@ -182,11 +218,65 @@ function guest() {
   return html;
 }
 
+function sprayPage() {
+  if (S.isGuest) return `<div class="card">${t('guest_no_spray')}</div>`;
+  return `<div class="card">
+      <p>${t('spray_hint')}</p>
+      <p class="hint">${t('spray_wall_hint')}</p>
+      <button class="btn2" id="mfree">${t('spray_free')}</button>
+      <button class="btn2" id="mtext">${t('spray_text')}</button>
+      <canvas id="spray-cv" width="900" height="280"></canvas>
+      <input class="inp hidden" id="stxt" maxlength="28" placeholder="${t('text_placeholder')}"/>
+    </div>`;
+}
+
+function bindSprayPage() {
+  const cv = $('spray-cv');
+  if (!cv) return;
+  const ctx = cv.getContext('2d');
+  let draw = false;
+  const pos = (e) => {
+    const r = cv.getBoundingClientRect();
+    return { x: (e.clientX - r.left) * cv.width / r.width, y: (e.clientY - r.top) * cv.height / r.height };
+  };
+  cv.onpointerdown = (e) => {
+    draw = true;
+    const p = pos(e);
+    ctx.beginPath();
+    ctx.moveTo(p.x, p.y);
+    cv.setPointerCapture(e.pointerId);
+  };
+  cv.onpointermove = (e) => {
+    if (!draw) return;
+    const p = pos(e);
+    ctx.strokeStyle = colorHex(S.gang && S.gang.color);
+    ctx.lineWidth = 4;
+    ctx.lineCap = 'round';
+    ctx.lineTo(p.x, p.y);
+    ctx.stroke();
+  };
+  cv.onpointerup = () => { draw = false; };
+  const txt = $('stxt');
+  if ($('mtext')) $('mtext').onclick = () => { txt.classList.remove('hidden'); };
+  if ($('mfree')) $('mfree').onclick = () => { txt.classList.add('hidden'); };
+}
+
+function notifs() {
+  const rows = S.notifs || [];
+  if (!rows.length) return `<div class="card">${t('no_notifs')}</div>`;
+  return rows.map((n) => {
+    const key = n.title || n.type || '';
+    const title = t(key) !== key ? t(key) : (t('act_' + key) !== ('act_' + key) ? t('act_' + key) : key);
+    return `<div class="log"><b>${esc(title)}</b>
+      <div class="xp">${esc(n.message || '')} · ${esc(n.created_at || '')}</div></div>`;
+  }).join('');
+}
+
 function logs() {
-  if (!S.isLeader && !S.isAdmin) return '';
+  if (!S.isLeader && !S.isAdmin) return `<div class="card">${t('logs_only')}</div>`;
   const sprays = S.isAdmin ? (S.adminSprays || S.sprayLog || []) : (S.sprayLog || []);
   const acts = S.activityLog || [];
-  let html = `<div class="log"><b>${t('spray_log')}</b></div>`;
+  let html = `<p class="hint">${t('logs_only')}</p><div class="card"><b>${t('spray_log')}</b></div>`;
   html += sprays.length ? sprays.map((r) => `<div class="log">
       <b>${esc(r.player_name || '')}${r.gang_label ? ' · ' + esc(r.gang_label) : ''}</b>
       <div class="xp">${r.mode === 'text' ? t('mode_text') : t('mode_free')} · ${esc(r.text_content || '')} · ${esc(r.created_at || '')}</div>
@@ -201,57 +291,73 @@ function logs() {
 }
 
 function leader() {
-  if (!S.isLeader) return '';
+  if (!S.isLeader) return `<div class="card">${t('not_leader')}</div>`;
   const icons = (S.icons || []).map((ic) =>
-    `<button data-act='{"a":"requestIcon","icon":"${ic.id}"}'>${lang === 'ar' ? ic.ar : ic.en}</button>`
+    `<option value="${ic.id}">${lang === 'ar' ? ic.ar : ic.en}</option>`
   ).join('');
   const colors = (S.colors || []).map((c) =>
-    `<button data-act='{"a":"setColor","color":"${c.id}"}' style="background:${c.hex};color:#111">${lang === 'ar' ? c.ar : c.en}</button>`
-  ).join('');
+    `<button class="swatch" data-act='{"a":"setColor","color":"${c.id}"}' style="background:${c.hex}" title="${lang === 'ar' ? c.ar : c.en}"></button>`
+  ).join(' ');
   const mem = (S.members || []).filter((m) => !m.guest).map((m) => `<div class="log">
     ${esc(m.name)} · ${esc(m.rankLabel)}
-    <button data-act='{"a":"setRank","identifier":"${esc(m.identifier)}","rank":${Math.min((m.rank || 1) + 1, 4)}}'>${t('promote')}</button>
-    <button data-act='{"a":"setRank","identifier":"${esc(m.identifier)}","rank":${Math.max((m.rank || 1) - 1, 1)}}'>${t('demote')}</button>
+    <button class="btn2" data-act='{"a":"setRank","identifier":"${esc(m.identifier)}","rank":${Math.min((m.rank || 1) + 1, 4)}}'>${t('promote')}</button>
+    <button class="btn2" data-act='{"a":"setRank","identifier":"${esc(m.identifier)}","rank":${Math.max((m.rank || 1) - 1, 1)}}'>${t('demote')}</button>
     <button class="manage" data-act='{"a":"kick","identifier":"${esc(m.identifier)}"}'>${t('kick')}</button>
   </div>`).join('');
-  return `<div class="card"><button class="btn" data-act='{"a":"setHQ"}'>${t('set_hq')}</button></div>
-    <div class="card">${t('color')}<div class="row">${colors}</div></div>
-    <div class="card">${t('icon')}<div class="row">${icons}</div><div class="xp">${t('pending')}</div></div>
-    <div class="card"><input id="ann" placeholder="${t('announce')}"/><button class="btn" id="ann-go">${t('announce')}</button></div>
-    <div class="card"><button data-act='{"a":"wipeGangSprays"}'>${t('wipe_gang_sprays')}</button></div>
-    ${mem}`;
+  return `<div class="grid2">
+      <div class="card"><b>${t('set_hq')}</b><p class="hint">${t('color')}</p>
+        <button class="btn" data-act='{"a":"setHQ"}'>${t('set_hq')}</button>
+        <p class="hint">${t('color')}</p>
+        <div class="row">${colors}</div>
+      </div>
+      <div class="card"><b>${t('icon')}</b><p class="hint">${t('pending')}</p>
+        <select class="inp" id="icon-sel">${icons}</select>
+        <button class="btn" id="icon-go">${t('request_icon')}</button>
+      </div>
+    </div>
+    <div class="card"><b>${t('announce')}</b><input class="inp" id="ann" placeholder="${t('announce')}"/><button class="btn" id="ann-go">${t('announce')}</button></div>
+    <div class="card"><b>${t('members')}</b>${mem}
+      <button class="btn no" data-act='{"a":"wipeGangSprays"}'>${t('wipe_gang_sprays')}</button>
+    </div>`;
 }
 
 function admin() {
-  if (!S.isAdmin) return '';
+  if (!S.isAdmin) return `<div class="card">${t('not_admin')}</div>`;
   const gangs = (S.gangs || []).map((g) => `<option value="${g.id}">${esc(g.label)}</option>`).join('');
   const pending = (S.pendingIcons || []).map((p) => `<div class="log">
     ${esc(p.label)}: ${esc(iconLabel(p.current))} → ${esc(iconLabel(p.pending))}
-    <button class="btn" data-act='{"a":"approveIcon","gangId":${p.id}}'>${t('approve')}</button>
-    <button data-act='{"a":"rejectIcon","gangId":${p.id}}'>${t('reject')}</button>
+    <button class="btn ok" data-act='{"a":"approveIcon","gangId":${p.id}}'>${t('approve')}</button>
+    <button class="btn no" data-act='{"a":"rejectIcon","gangId":${p.id}}'>${t('reject')}</button>
   </div>`).join('') || `<div class="xp">${t('none')}</div>`;
-  return `<div class="card">
-      <input id="g-name" placeholder="${t('name')}"/>
-      <input id="g-label" placeholder="${t('label')}"/>
-      <input id="g-tag" placeholder="${t('tag')}"/>
-      <button class="btn" id="g-create">${t('create_gang')}</button>
+  return `<div class="grid2">
+      <div class="card"><b>${t('create_gang')}</b>
+        <input class="inp" id="g-name" placeholder="${t('name')}"/>
+        <input class="inp" id="g-label" placeholder="${t('label')}"/>
+        <input class="inp" id="g-tag" placeholder="${t('tag')}"/>
+        <button class="btn" id="g-create">${t('create_gang')}</button>
+      </div>
+      <div class="card"><b>${t('set_leader')}</b>
+        <select class="inp" id="g-sel">${gangs}</select>
+        <input class="inp" id="g-sid" placeholder="ID"/>
+        <button class="btn" id="g-leader">${t('set_leader')}</button>
+        <button class="btn2" id="g-clear-leader">${t('clear_leader')}</button>
+        <button class="btn2" id="g-add">${t('add_member')}</button>
+        <button class="btn no" id="g-del">${t('delete_gang')}</button>
+      </div>
     </div>
-    <div class="card">
-      <select id="g-sel">${gangs}</select>
-      <input id="g-sid" placeholder="ID"/>
-      <button id="g-leader">${t('set_leader')}</button>
-      <button id="g-clear-leader">${t('clear_leader')}</button>
-      <button id="g-add">${t('add_member')}</button>
-      <button class="manage" id="g-del">${t('delete_gang')}</button>
-      <button id="g-wipe">${t('wipe_gang_sprays')}</button>
-      <input id="g-pts" placeholder="${t('points')}"/>
-      <button id="g-pts-go">${t('adjust_points')}</button>
-    </div>
-    <div class="card"><button class="manage" id="wipe-all">${t('wipe_all_sprays')}</button></div>
-    <div class="log"><b>${t('pending_icons')}</b></div>${pending}`;
+    <div class="card"><b>${t('pending_icons')}</b>${pending}</div>
+    <div class="card"><b>${t('all_sprays')}</b>
+      <button class="btn2" id="g-wipe">${t('wipe_gang_sprays')}</button>
+      <input class="inp" id="g-pts" placeholder="${t('points')}"/>
+      <button class="btn2" id="g-pts-go">${t('adjust_points')}</button>
+      <button class="btn no" id="wipe-all">${t('wipe_all_sprays')}</button>
+    </div>`;
 }
 
-const views = { home, places, rankings, members: membersView, summon, guest, logs, leader, admin };
+const views = {
+  home, places, map: mapView, rankings, members: membersView,
+  summon, guest, spray: sprayPage, notifs, logs, leader, admin
+};
 
 function render() {
   const g = S.gang;
@@ -262,6 +368,7 @@ function render() {
   $('search').classList.toggle('hidden', page !== 'members');
   renderNav();
   $('page').innerHTML = (views[page] || home)();
+  if (page === 'spray') bindSprayPage();
 }
 
 function openTablet(data) {
@@ -273,7 +380,8 @@ function openTablet(data) {
   page = 'home';
   if (MOCK) {
     const q = new URLSearchParams(location.search).get('page');
-    if (q && views[q]) page = q;
+    if (q === 'places') page = 'map';
+    else if (q && views[q]) page = q;
   }
   render();
 }
@@ -306,6 +414,10 @@ $('page').onclick = (e) => {
     post('action', JSON.parse(b.getAttribute('data-act')));
     setTimeout(() => post('refresh'), 250);
     return;
+  }
+  if (e.target.id === 'icon-go') {
+    post('action', { a: 'requestIcon', icon: $('icon-sel').value });
+    setTimeout(() => post('refresh'), 250);
   }
   if (e.target.id === 'guest-go') {
     post('action', { a: 'inviteGuest', id: $('guest-id').value });
@@ -440,9 +552,16 @@ if (MOCK) {
     tablet_title: 'WSMM GANGS', close: 'إغلاق', home: 'عصابتي', places: 'الخريطة',
     points: 'النقاط', rankings: 'ترتيب العصابات', members: 'أعضاء العصابة', summon: 'استدعاء كامل',
     guest: 'الدعوات', logs: 'السجلات', sprays: 'البخات', place: 'الترتيب',
+    notifs: 'التنويهات', map_legend: 'مناطق العصابات',
+    map_hint: 'خريطة لوس سانتوس: كل دائرة تيرف عصابة. اللون = العصابة المسيطرة. الفاضي بدون سيطرة.',
+    spray_hint: 'وضعين: رسم حر أو كتابة. بدون رفع صور. الكلام الوسخ ينحجب.',
+    spray_wall_hint: 'البخ الحقيقي على الجدار بعلبة البخاخ. هالصفحة للتجربة داخل التابلت.',
+    logs_only: 'السجلات لليدر والإدارة فقط.', request_icon: 'طلب الأيقونة',
+    guest_no_spray: 'الضيف ما يقدر يبخ.', not_leader: 'هالخيار للقائد فقط.', not_admin: 'هالخيار للأدمن فقط.',
+    no_notifs: 'ما في تنويهات.', all_sprays: 'كل البخاخات',
     activity_log: 'سجل النشاط', no_activity: 'ما في نشاط.', clear_leader: 'إزالة القائد',
-    spray_log: 'سجل البخ', leader: 'القائد', admin: 'أدمن',
-    spray: 'بخة', online: 'أونلاين', offline: 'غير متصل', connected: 'متصل', guest_tag: 'ضيف',
+    spray_log: 'سجل البخ', leader: 'قائمة الليدر', admin: 'قائمة الإدارة',
+    spray: 'البخاخ', online: 'أونلاين', offline: 'غير متصل', connected: 'متصل', guest_tag: 'ضيف',
     owner: 'المسيطر', none: 'فاضي', send_summon: 'استدعاء العصابة كلها',
     summon_hint: 'كل الأعضاء الأونلاين ياخذون علامة على الخريطة.',
     invite_guest: 'دعوة ضيف (آيدي)', remove: 'إزالة', delete: 'حذف', announce: 'إعلان',
@@ -467,9 +586,29 @@ if (MOCK) {
   openTablet({
     lang: 'ar', strings, isAdmin, isLeader, isGuest: false, isMember: true,
     gang: { id: 1, label: 'آل فخامة', tag: 'DARK', color: 'red', icon: 'skull', pendingIcon: 'crown', points: 35135, sprays: 12 },
-    colors: [{ id: 'red', hex: '#c43b4a', ar: 'أحمر', en: 'Red' }, { id: 'blue', hex: '#3498db', ar: 'أزرق', en: 'Blue' }],
-    icons: [{ id: 'skull', ar: 'جمجمة', en: 'Skull' }, { id: 'crown', ar: 'تاج', en: 'Crown' }],
-    places: [{ label: 'قروف ستريت', owner: 'آل فخامة' }, { label: 'ديفيس', owner: null }, { label: 'ساندي شورز', owner: null }, { label: 'باليتو باي', owner: null }],
+    colors: [
+      { id: 'red', hex: '#e74c3c', ar: 'أحمر', en: 'Red' },
+      { id: 'green', hex: '#27ae60', ar: 'أخضر', en: 'Green' },
+      { id: 'blue', hex: '#3498db', ar: 'أزرق', en: 'Blue' },
+      { id: 'yellow', hex: '#e2b039', ar: 'أصفر', en: 'Yellow' },
+      { id: 'purple', hex: '#9b59b6', ar: 'بنفسجي', en: 'Purple' }
+    ],
+    icons: [
+      { id: 'gang', ar: 'عصابة', en: 'Gang' }, { id: 'skull', ar: 'جمجمة', en: 'Skull' },
+      { id: 'crown', ar: 'تاج', en: 'Crown' }, { id: 'gun', ar: 'سلاح', en: 'Gun' }
+    ],
+    places: [
+      { id: 'grove', label: 'قروف ستريت', owner: 'آل فخامة', hex: '#e74c3c', x: -132, y: -1609, radius: 95 },
+      { id: 'davis', label: 'ديفيس', owner: 'بلوود', hex: '#9b1c2c', x: 96, y: -1735, radius: 95 },
+      { id: 'strawberry', label: 'ستروبيري', owner: 'قولدن', hex: '#e2b039', x: 56, y: -1350, radius: 90 },
+      { id: 'vinewood', label: 'فاينوود', owner: 'آل تشابو', hex: '#e67e22', x: 318, y: 180, radius: 120 },
+      { id: 'delperro', label: 'ديل بيرو', owner: null, hex: '#8d9199', x: -1550, y: -580, radius: 130 },
+      { id: 'sandy', label: 'ساندي شورز', owner: 'آل محترم', hex: '#3498db', x: 1848, y: 3680, radius: 160 },
+      { id: 'paleto', label: 'باليتو باي', owner: null, hex: '#27ae60', x: -140, y: 6350, radius: 170 },
+      { id: 'elburro', label: 'إل بورّو', owner: 'آل بارود', hex: '#9b59b6', x: 1380, y: -2100, radius: 130 },
+      { id: 'mirror', label: 'ميرور بارك', owner: null, hex: '#8d9199', x: 1078, y: -540, radius: 110 },
+      { id: 'rancho', label: 'رانشو', owner: null, hex: '#8d9199', x: 412, y: -2012, radius: 110 }
+    ],
     rankings: [
       { id: 1, label: 'آل فخامة', tag: 'DARK', points: 35135, sprays: 12, zones: 1, score: 35135 },
       { id: 2, label: 'بلوود', tag: 'BLOOD', points: 33645, sprays: 12, zones: 0, score: 33645 },
@@ -486,6 +625,11 @@ if (MOCK) {
       { identifier: 'e', name: 'محمد المطيري', rank: 4, rankLabel: 'نائب القائد', online: true, sprays: 2 }
     ],
     guests: [{ identifier: 'g', name: 'ضيف تجريبي' }],
+    notifs: [
+      { title: 'summon_banner', message: 'قولدن تصوير', created_at: 'الآن' },
+      { title: 'rival_spray', message: 'قروف ستريت', created_at: 'قبل شوي' },
+      { title: 'icon_approved', message: 'تاج', created_at: 'أمس' }
+    ],
     sprayLog: isLeader ? [{ id: 1, player_name: 'حمود', mode: 'text', text_content: 'WLF', x: 1, y: 2, created_at: 'الآن' }] : null,
     activityLog: isLeader ? [{ actor_name: 'أدمن', action: 'set_leader', detail: 'حمود', created_at: 'الآن' }] : null,
     adminSprays: [{ id: 1, gang_label: 'آل فخامة', player_name: 'حمود', mode: 'freehand', created_at: 'الآن' }],

@@ -179,6 +179,7 @@ RegisterNetEvent('wsmm_gangs:saveSpray', function(payload)
         if st and st.owner_gang_id and st.owner_gang_id ~= gang.id then
             MySQL.update.await('UPDATE wsmm_gangs SET points = GREATEST(points - 2, 0) WHERE id = ?', { st.owner_gang_id })
             WG.NotifyLeaders(st.owner_gang_id, 'rival_spray')
+            WG.PushNotif(st.owner_gang_id, 'rival', 'rival_spray', zoneId or '')
         end
     end
     MySQL.update.await('UPDATE wsmm_gangs SET points = points + ?, spray_count = spray_count + 1 WHERE id = ?', { pts, gang.id })
