@@ -428,6 +428,9 @@
         const f = document.getElementById('iconfile'); if (f) f.click();
         return;
       }
+      if (act === 'enter') { inspectGang = gangs[Number(b.getAttribute('data-i')||0)]; render(); return; }
+      if (act === 'togglez') { const z = zones[Number(b.getAttribute('data-i')||0)]; z.open = !z.open; if (!z.open) z.owner = ''; render(); return; }
+      if (act === 'clearz') { const z = zones[Number(b.getAttribute('data-i')||0)]; z.owner = ''; render(); return; }
       if (act === 'backg') { inspectGang = null; render(); return; }
       toast('تم (هذا عرض شكل — يشتغل كامل داخل اللعبة)');
     });
