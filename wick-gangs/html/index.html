@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="ar">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <link rel="stylesheet" href="style.css"/>
+  <title>wick-gangs</title>
+</head>
+<body>
+  <div id="toast" hidden></div>
+
+  <div id="summon" class="banner" hidden>
+    <div>
+      <strong id="summon-title"></strong>
+      <div id="summon-sub"></div>
+    </div>
+    <div class="row">
+      <button id="summon-ok" class="ok"></button>
+      <button id="summon-no"></button>
+    </div>
+  </div>
+
+  <div id="tablet" hidden>
+    <header>
+      <div>
+        <div id="gang-name">—</div>
+        <small id="gang-meta"></small>
+      </div>
+      <div class="row">
+        <button id="btn-lang"></button>
+        <button id="btn-close">✕</button>
+      </div>
+    </header>
+    <nav id="nav"></nav>
+    <main id="page"></main>
+  </div>
+
+  <div id="spray" hidden>
+    <div class="spray-box">
+      <div class="row">
+        <button id="mode-free" class="ok"></button>
+        <button id="mode-text"></button>
+      </div>
+      <canvas id="cv" width="420" height="260"></canvas>
+      <input id="spray-text" maxlength="28" hidden/>
+      <div class="row">
+        <button id="spray-ok" class="ok"></button>
+        <button id="spray-cancel"></button>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

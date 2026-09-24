@@ -1,0 +1,66 @@
+* { box-sizing: border-box; }
+html, body {
+  margin: 0;
+  background: transparent;
+  font-family: Tahoma, Arial, sans-serif;
+  color: #eee;
+}
+body.rtl { direction: rtl; }
+body.ltr { direction: ltr; }
+button, input {
+  font: inherit;
+  border: 0;
+  border-radius: 6px;
+  padding: 8px 10px;
+  background: #2a2a2a;
+  color: #eee;
+  cursor: pointer;
+}
+button.ok { background: #c0392b; }
+input { width: 100%; background: #1a1a1a; color: #eee; }
+.row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+#toast {
+  position: fixed; top: 18px; left: 50%; transform: translateX(-50%);
+  background: #111; padding: 8px 14px; border-radius: 8px; z-index: 50;
+}
+[hidden] { display: none !important; }
+#tablet {
+  position: absolute; inset: 8vh 18vw;
+  background: #141414; border: 2px solid #333; border-radius: 12px;
+  display: flex; flex-direction: column; overflow: hidden;
+}
+header {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 10px 12px; border-bottom: 3px solid var(--gang, #c0392b);
+}
+#gang-name { font-size: 18px; font-weight: 700; }
+nav {
+  display: flex; flex-wrap: wrap; gap: 6px;
+  padding: 8px; background: #1b1b1b;
+}
+nav button[data-on="1"] { background: #c0392b; }
+main { padding: 10px 12px; overflow: auto; flex: 1; }
+.card {
+  background: #1c1c1c; border-radius: 8px; padding: 10px; margin-bottom: 8px;
+}
+.muted { color: #aaa; font-size: 12px; }
+.dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-inline-end: 6px; }
+.dot.on { background: #2ecc71; }
+.dot.off { background: #7f8c8d; }
+#spray {
+  position: absolute; inset: 0;
+  background: rgba(0,0,0,.55);
+  display: flex; align-items: center; justify-content: center;
+}
+.spray-box {
+  background: #151515; padding: 12px; border-radius: 10px; width: 460px;
+}
+canvas { width: 100%; background: #0c0c0c; border: 1px dashed #555; touch-action: none; }
+.banner {
+  position: absolute; top: 12vh; left: 50%; transform: translateX(-50%);
+  background: #1a1a1a; padding: 12px; border-radius: 10px;
+  display: flex; gap: 16px; align-items: center; min-width: 320px;
+}
+@media (max-width: 900px) {
+  #tablet { inset: 4vh 4vw; }
+}
