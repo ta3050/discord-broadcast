@@ -74,6 +74,79 @@ function renderNav() {
   $('nav').innerHTML = navItems().map(([id, key]) =>
     `<button class="nav ${page === id ? 'active' : ''}" data-page="${id}"><span class="nav-ic">${NAV_ICONS[id] || ''}</span>${t(key)}</button>`
   ).join('');
+  syncRail();
+}
+
+function menuScroller() {
+  return $('side-pane') || document.querySelector('.side');
+}
+
+function scrollMenu(dy) {
+  const pane = menuScroller();
+  const main = $('page');
+  if (!pane) return;
+  const max = Math.max(0, pane.scrollHeight - pane.clientHeight);
+  const next = Math.min(max, Math.max(0, pane.scrollTop + dy));
+  if (max > 1 && ((dy < 0 && pane.scrollTop > 0) || (dy > 0 && pane.scrollTop < max))) {
+    pane.scrollTop = next;
+  } else if (main) {
+    main.scrollTop += dy;
+  }
+  syncRail();
+}
+
+function syncRail() {
+  const pane = menuScroller();
+  const thumb = $('rail-thumb');
+  const track = $('rail-track');
+  if (!pane || !thumb || !track) return;
+  const view = pane.clientHeight || 1;
+  const full = pane.scrollHeight || 1;
+  const trackH = track.clientHeight || 1;
+  const thumbH = Math.max(40, Math.min(trackH, (view / full) * trackH));
+  const maxTop = Math.max(0, trackH - thumbH);
+  const maxScroll = Math.max(1, full - view);
+  thumb.style.height = thumbH + 'px';
+  thumb.style.top = (pane.scrollTop / maxScroll) * maxTop + 'px';
+}
+
+function bindSideRail() {
+  if (bindSideRail.done) return;
+  bindSideRail.done = true;
+  const pane = $('side-pane');
+  const up = $('rail-up');
+  const down = $('rail-down');
+  const track = $('rail-track');
+  const thumb = $('rail-thumb');
+  if (pane) {
+    pane.addEventListener('scroll', syncRail);
+    pane.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      scrollMenu(e.deltaY);
+    }, { passive: false });
+  }
+  if (up) up.onclick = () => scrollMenu(-72);
+  if (down) down.onclick = () => scrollMenu(72);
+  if (track && thumb && pane) {
+    const jump = (clientY) => {
+      const r = track.getBoundingClientRect();
+      const y = clientY - r.top - thumb.offsetHeight / 2;
+      const maxTop = Math.max(1, r.height - thumb.offsetHeight);
+      const ratio = Math.min(1, Math.max(0, y / maxTop));
+      pane.scrollTop = ratio * Math.max(0, pane.scrollHeight - pane.clientHeight);
+      syncRail();
+    };
+    track.onmousedown = (e) => {
+      jump(e.clientY);
+      const move = (ev) => jump(ev.clientY);
+      const upl = () => {
+        window.removeEventListener('mousemove', move);
+        window.removeEventListener('mouseup', upl);
+      };
+      window.addEventListener('mousemove', move);
+      window.addEventListener('mouseup', upl);
+    };
+  }
 }
 
 function esc(s) {
@@ -142,6 +215,7 @@ function mapBox(z) {
   const left = 12 + ((x + 1850) / 2950) * 60;
   const top = 12 + ((400 - y) / 3200) * 70;
   const w = Math.max(5.2, Math.min(10, (Number(z.size || z.radius) || 90) * 0.055));
+  if (!Number.isFinite(left) || !Number.isFinite(top)) return null;
   if (left < -3 || left > 103 || top < -3 || top > 103) return null;
   return { left, top, w, h: w };
 }
@@ -507,6 +581,8 @@ function render() {
   $('page').innerHTML = (views[page] || home)();
   if (page === 'spray') bindSprayPage();
   bindIconUpload();
+  bindSideRail();
+  requestAnimationFrame(syncRail);
 }
 
 function openTablet(data) {
