@@ -8,152 +8,126 @@
   <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@500;600;700;800&display=swap" rel="stylesheet" />
   <style>
     :root {
-      --bg: #070405;
-      --panel: #12080c;
-      --card: #1a0d12;
-      --line: #3a1a22;
-      --red: #9a2b38;
-      --red-hot: #c43b4a;
-      --gold: #e2b039;
-      --gold-2: #f0c85a;
-      --silver: #8d9199;
-      --muted: #9a858b;
-      --text: #f4ecee;
-      --online: #3dcf7a;
-      --gang: #c43b4a;
+      --bg: #070405; --panel: #12080c; --card: #1a0d12; --line: #3a1a22;
+      --red: #9a2b38; --red-hot: #c43b4a; --gold: #e2b039; --muted: #9a858b;
+      --text: #f4ecee; --online: #3dcf7a;
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
       min-height: 100vh;
       background: radial-gradient(1200px 700px at 80% -10%, #3a1018 0%, transparent 50%), var(--bg);
-      color: var(--text);
-      font-family: Cairo, Tahoma, sans-serif;
+      color: var(--text); font-family: Cairo, Tahoma, sans-serif;
     }
     .shell {
-      width: min(1280px, 96vw);
-      height: min(760px, 94vh);
-      margin: 3vh auto;
-      display: grid;
-      grid-template-columns: 1fr 228px;
+      width: min(1280px, 96vw); height: min(760px, 94vh); margin: 3vh auto;
+      display: grid; grid-template-columns: 1fr 228px;
       background: linear-gradient(180deg, #16090d, var(--panel));
-      border: 1px solid var(--line);
-      border-radius: 22px;
-      overflow: hidden;
+      border: 1px solid var(--line); border-radius: 22px; overflow: hidden;
       box-shadow: 0 30px 80px rgba(0,0,0,.55);
     }
     .main { display: flex; flex-direction: column; min-width: 0; }
-    .top {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 18px 24px 8px;
-    }
+    .top { display: flex; align-items: center; justify-content: space-between; padding: 18px 24px 8px; }
     .brand { display: flex; align-items: center; gap: 10px; font-weight: 800; font-size: 22px; }
-    .skull {
-      width: 34px; height: 34px; border-radius: 10px;
-      background: var(--red); display: grid; place-items: center; font-size: 18px;
-    }
+    .skull { width: 34px; height: 34px; border-radius: 10px; background: var(--red); display: grid; place-items: center; }
     .page-title { color: var(--muted); font-weight: 700; }
-    .side {
-      background: #0c0608;
-      border-right: 1px solid var(--line);
-      padding: 18px 12px;
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-    }
+    .side { background: #0c0608; border-right: 1px solid var(--line); padding: 14px 10px; overflow: auto; }
     .nav {
-      width: 100%;
-      border: 0;
-      background: transparent;
-      color: #d7c4c8;
-      display: flex;
-      align-items: center;
-      justify-content: flex-start;
-      gap: 10px;
-      padding: 11px 12px;
-      border-radius: 10px;
-      cursor: pointer;
-      font: inherit;
-      font-weight: 700;
+      width: 100%; border: 0; background: transparent; color: #d7c4c8;
+      display: flex; gap: 8px; padding: 10px 12px; border-radius: 10px;
+      cursor: pointer; font: inherit; font-weight: 700; margin-bottom: 4px;
     }
     .nav.active { background: var(--red); color: #fff; }
     .nav:hover:not(.active) { background: #1c0d12; }
-    .content { padding: 8px 24px 24px; overflow: auto; }
-    .podium {
-      display: grid;
-      grid-template-columns: 1fr 1.15fr 1fr;
-      gap: 18px;
-      align-items: end;
-      margin: 18px auto 28px;
-      max-width: 720px;
-    }
+    .content { padding: 8px 24px 24px; overflow: auto; flex: 1; }
+    .podium { display: grid; grid-template-columns: 1fr 1.15fr 1fr; gap: 18px; align-items: end; margin: 18px auto 28px; max-width: 720px; }
     .spot { text-align: center; }
-    .avatar {
-      width: 78px; height: 78px; margin: 0 auto 8px; border-radius: 18px;
-      background: #2a141a; border: 2px solid var(--line);
-      display: grid; place-items: center; font-size: 28px; overflow: hidden;
-    }
-    .spot.gold .avatar { width: 96px; height: 96px; border-color: var(--gold); box-shadow: 0 0 24px rgba(226,176,57,.35); }
+    .avatar { width: 78px; height: 78px; margin: 0 auto 8px; border-radius: 18px; background: #2a141a; border: 2px solid var(--line); display: grid; place-items: center; font-size: 28px; }
+    .gold .avatar { width: 96px; height: 96px; border-color: var(--gold); box-shadow: 0 0 24px rgba(226,176,57,.35); }
     .name { font-weight: 800; }
     .tag { color: var(--gold); font-size: 13px; }
     .xp { color: var(--muted); font-size: 13px; margin-top: 4px; }
-    .plinth {
-      margin-top: 12px; padding: 14px 8px; border-radius: 12px 12px 4px 4px; font-weight: 800;
-    }
+    .plinth { margin-top: 12px; padding: 14px 8px; border-radius: 12px 12px 4px 4px; font-weight: 800; }
     .gold .plinth { background: linear-gradient(#f0c85a, #c9921c); color: #2a1a00; }
     .silver .plinth { background: linear-gradient(#cfd3da, #7c818a); color: #1b1d22; }
     .bronze .plinth { background: linear-gradient(#e0a24a, #9a6416); color: #2a1700; }
     .list { display: flex; flex-direction: column; gap: 8px; }
-    .row {
-      display: grid;
-      grid-template-columns: 52px 1fr auto;
-      align-items: center;
-      background: #14090d;
-      border: 1px solid #2a151b;
-      border-radius: 10px;
-      padding: 10px 14px;
-    }
-    .rank-num {
-      width: 28px; height: 28px; border-radius: 8px;
-      background: #3a1820; display: grid; place-items: center; font-weight: 800; color: #ffd9df;
-    }
-    .search {
-      width: 260px;
-      background: #14090d;
-      border: 1px solid var(--line);
-      color: #fff;
-      border-radius: 10px;
-      padding: 8px 12px;
-      font: inherit;
-    }
+    .row { display: grid; grid-template-columns: 52px 1fr auto; align-items: center; background: #14090d; border: 1px solid #2a151b; border-radius: 10px; padding: 10px 14px; }
+    .rank-num { width: 28px; height: 28px; border-radius: 8px; background: #3a1820; display: grid; place-items: center; font-weight: 800; color: #ffd9df; }
+    .search, .inp { background: #14090d; border: 1px solid var(--line); color: #fff; border-radius: 10px; padding: 8px 12px; font: inherit; }
+    .search { width: 260px; }
+    .inp { width: 100%; margin: 6px 0 10px; }
     table { width: 100%; border-collapse: collapse; }
     th, td { padding: 12px 10px; text-align: right; }
-    th { color: var(--muted); font-size: 13px; font-weight: 700; }
+    th { color: var(--muted); font-size: 13px; }
     tr { border-bottom: 1px solid #241015; }
-    .pill {
-      display: inline-block; padding: 3px 10px; border-radius: 8px;
-      background: #3a1820; color: #ffd0d6; font-size: 12px; font-weight: 700;
-    }
+    .pill { display: inline-block; padding: 3px 10px; border-radius: 8px; background: #3a1820; color: #ffd0d6; font-size: 12px; font-weight: 700; }
     .on { color: var(--online); font-weight: 700; }
     .off { color: #8a7378; }
-    .manage {
-      background: var(--red); color: #fff; border: 0; border-radius: 8px;
-      padding: 6px 10px; cursor: pointer; font: inherit; font-weight: 700;
+    .manage, .btn, .btn2 {
+      border: 0; border-radius: 8px; padding: 8px 12px; cursor: pointer; font: inherit; font-weight: 700; color: #fff;
     }
+    .manage, .btn { background: var(--red); }
+    .btn { border-radius: 12px; padding: 12px 16px; }
+    .btn2 { background: #2a151b; }
+    .ok { background: #1e7a45; }
+    .no { background: #7a1e28; }
     .cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 18px; }
-    .card {
-      background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 16px;
-    }
-    .card b { display: block; font-size: 26px; color: var(--gold); }
-    .btn {
-      background: var(--red-hot); color: #fff; border: 0; border-radius: 12px;
-      padding: 12px 16px; font: inherit; font-weight: 800; cursor: pointer;
-    }
-    .zones { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
-    .zone { background: #14090d; border: 1px solid var(--line); border-radius: 12px; padding: 14px; }
+    .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 16px; margin-bottom: 10px; }
+    .card b.big { display: block; font-size: 26px; color: var(--gold); }
+    .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
     .hidden { display: none !important; }
     .log { background: #14090d; border: 1px solid var(--line); border-radius: 12px; padding: 12px; margin-bottom: 8px; }
+    .hint { font-size: 12px; color: var(--muted); margin: 8px 0 12px; }
+    .swatch { width: 28px; height: 28px; border-radius: 8px; border: 0; cursor: pointer; }
+    .gta-map {
+      position: relative; height: 560px; border-radius: 16px; overflow: hidden;
+      border: 1px solid #2a151b;
+      background:
+        radial-gradient(circle at 18% 72%, rgba(40,90,70,.35), transparent 22%),
+        radial-gradient(circle at 78% 28%, rgba(70,60,40,.4), transparent 26%),
+        linear-gradient(#0b2a33, #082028 40%, #12301c 70%, #1a2a14);
+    }
+    .gta-map::before {
+      content: ""; position: absolute; inset: 0;
+      background-image:
+        linear-gradient(rgba(255,255,255,.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,.04) 1px, transparent 1px);
+      background-size: 42px 42px; opacity: .35;
+    }
+    .land {
+      position: absolute; left: 8%; top: 10%; width: 84%; height: 80%;
+      background:
+        radial-gradient(ellipse at 50% 60%, #2a3a28 0%, #1a2818 42%, transparent 70%),
+        radial-gradient(ellipse at 30% 40%, #3a3428 0%, transparent 40%);
+      border-radius: 38% 42% 36% 40%;
+      box-shadow: inset 0 0 80px rgba(0,0,0,.45);
+    }
+    .road {
+      position: absolute; background: rgba(220,200,160,.14); transform: rotate(var(--r, 0deg));
+    }
+    .zone {
+      position: absolute; transform: translate(50%, -50%);
+      width: var(--s, 86px); height: var(--s, 86px); border-radius: 50%;
+      border: 2px solid var(--c); background: color-mix(in srgb, var(--c) 28%, transparent);
+      box-shadow: 0 0 18px color-mix(in srgb, var(--c) 45%, transparent);
+      cursor: pointer;
+    }
+    .zone .dot {
+      position: absolute; left: 50%; top: 50%; width: 12px; height: 12px; margin: -6px;
+      border-radius: 50%; background: var(--c);
+    }
+    .zone .lab {
+      position: absolute; top: 108%; left: 50%; transform: translateX(-50%);
+      white-space: nowrap; background: #12080ce6; border: 1px solid var(--line);
+      border-radius: 8px; padding: 4px 8px; font-size: 12px; font-weight: 800;
+    }
+    .legend {
+      position: absolute; left: 12px; bottom: 12px; background: #12080ccc;
+      border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; z-index: 2;
+    }
+    .legend div { display: flex; align-items: center; gap: 8px; font-size: 12px; margin: 3px 0; }
+    .legend i { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+    canvas { width: 100%; height: 280px; background: #0c0c0c; border: 1px dashed #5a3038; border-radius: 12px; touch-action: none; }
   </style>
 </head>
 <body>
@@ -161,7 +135,7 @@
     <section class="main">
       <header class="top">
         <div class="brand"><span class="skull">☠</span> WSMM GANGS</div>
-        <div class="page-title" id="title">عصابتي</div>
+        <div class="page-title" id="title">الخريطة</div>
         <input class="search hidden" id="search" placeholder="البحث عن عضو.." />
       </header>
       <div class="content" id="view"></div>
@@ -170,12 +144,12 @@
   </div>
   <script>
     const gangs = [
-      { name: 'آل فخامة', tag: 'DARK', xp: 35135, sprays: 12, place: 1 },
-      { name: 'بلوود', tag: 'BLOOD', xp: 33645, sprays: 12, place: 2 },
-      { name: 'قولدن', tag: 'GOLDEN', xp: 32087, sprays: 11, place: 3 },
-      { name: 'آل تشابو', tag: 'CHAPO', xp: 25534, sprays: 10, place: 4 },
-      { name: 'آل محترم', tag: 'M7TRM', xp: 2500, sprays: 3, place: 5 },
-      { name: 'آل بارود', tag: '90s', xp: 150, sprays: 1, place: 6 }
+      { name: 'آل فخامة', tag: 'DARK', xp: 35135, sprays: 12, place: 1, color: '#e74c3c' },
+      { name: 'بلوود', tag: 'BLOOD', xp: 33645, sprays: 12, place: 2, color: '#9b1c2c' },
+      { name: 'قولدن', tag: 'GOLDEN', xp: 32087, sprays: 11, place: 3, color: '#e2b039' },
+      { name: 'آل تشابو', tag: 'CHAPO', xp: 25534, sprays: 10, place: 4, color: '#e67e22' },
+      { name: 'آل محترم', tag: 'M7TRM', xp: 2500, sprays: 3, place: 5, color: '#3498db' },
+      { name: 'آل بارود', tag: '90s', xp: 150, sprays: 1, place: 6, color: '#9b59b6' }
     ];
     const members = [
       { name: 'محمد بن نايف', role: 'عضو', on: true, sprays: 4 },
@@ -184,6 +158,16 @@
       { name: 'طارق بن عبدالله', role: 'عضو', on: true, sprays: 0 },
       { name: 'محمد المطيري', role: 'نائب القائد', on: true, sprays: 2 }
     ];
+    const zones = [
+      { name: 'قروف ستريت', owner: 'آل فخامة', c: '#e74c3c', x: '38%', y: '68%', s: '100px' },
+      { name: 'ديفيس', owner: 'بلوود', c: '#9b1c2c', x: '46%', y: '72%', s: '88px' },
+      { name: 'ستروبيري', owner: 'قولدن', c: '#e2b039', x: '42%', y: '58%', s: '80px' },
+      { name: 'فاينوود', owner: 'آل تشابو', c: '#e67e22', x: '48%', y: '38%', s: '92px' },
+      { name: 'ديل بيرو', owner: 'فاضي', c: '#8d9199', x: '22%', y: '48%', s: '86px' },
+      { name: 'ساندي شورز', owner: 'آل محترم', c: '#3498db', x: '70%', y: '32%', s: '110px' },
+      { name: 'باليتو باي', owner: 'فاضي', c: '#27ae60', x: '62%', y: '14%', s: '90px' },
+      { name: 'إل بورّو', owner: 'آل بارود', c: '#9b59b6', x: '64%', y: '70%', s: '84px' }
+    ];
     const pages = [
       ['home', 'عصابتي'],
       ['members', 'أعضاء العصابة'],
@@ -191,13 +175,18 @@
       ['rankings', 'ترتيب العصابات'],
       ['map', 'الخريطة'],
       ['summon', 'استدعاء كامل'],
-      ['logs', 'السجلات']
+      ['spray', 'البخاخ'],
+      ['notifs', 'التنويهات'],
+      ['logs', 'السجلات'],
+      ['leader', 'قائمة الليدر'],
+      ['admin', 'قائمة الإدارة']
     ];
-    let page = 'rankings';
+    let page = 'map';
     const nav = document.getElementById('nav');
     const view = document.getElementById('view');
     const title = document.getElementById('title');
     const search = document.getElementById('search');
+    const toast = (t) => { const n = document.createElement('div'); n.textContent = t; n.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#9a2b38;padding:10px 16px;border-radius:10px;z-index:9;font-weight:800'; document.body.appendChild(n); setTimeout(() => n.remove(), 1600); };
 
     function renderNav() {
       nav.innerHTML = pages.map(([id, label]) =>
@@ -206,59 +195,129 @@
     }
     function podium() {
       const [a,b,c,...rest] = gangs;
-      return `
-        <div class="podium">
-          <div class="spot bronze"><div class="avatar">🎖</div><div class="name">${c.name}</div><div class="tag">[${c.tag}]</div><div class="xp">خبرة ${c.xp} · ${c.sprays} بخة</div><div class="plinth">الثالث</div></div>
-          <div class="spot gold"><div class="avatar">🏆</div><div class="name">${a.name}</div><div class="tag">[${a.tag}]</div><div class="xp">خبرة ${a.xp} · ${a.sprays} بخة</div><div class="plinth">الأول</div></div>
-          <div class="spot silver"><div class="avatar">🥈</div><div class="name">${b.name}</div><div class="tag">[${b.tag}]</div><div class="xp">خبرة ${b.xp} · ${b.sprays} بخة</div><div class="plinth">الثاني</div></div>
-        </div>
-        <div class="list">${rest.map(g => `
-          <div class="row"><span class="rank-num">${g.place}</span><div><b>${g.name}</b> <span class="tag">[${g.tag}]</span></div><span class="xp">خبرة ${g.xp} · ${g.sprays} بخة</span></div>
-        `).join('')}</div>`;
+      return `<div class="podium">
+        <div class="spot bronze"><div class="avatar">🎖</div><div class="name">${c.name}</div><div class="tag">[${c.tag}]</div><div class="xp">خبرة ${c.xp} · ${c.sprays} بخة</div><div class="plinth">الثالث</div></div>
+        <div class="spot gold"><div class="avatar">🏆</div><div class="name">${a.name}</div><div class="tag">[${a.tag}]</div><div class="xp">خبرة ${a.xp} · ${a.sprays} بخة</div><div class="plinth">الأول</div></div>
+        <div class="spot silver"><div class="avatar">🥈</div><div class="name">${b.name}</div><div class="tag">[${b.tag}]</div><div class="xp">خبرة ${b.xp} · ${b.sprays} بخة</div><div class="plinth">الثاني</div></div>
+      </div>
+      <div class="list">${rest.map(g => `<div class="row"><span class="rank-num">${g.place}</span><div><b>${g.name}</b> <span class="tag">[${g.tag}]</span></div><span class="xp">خبرة ${g.xp} · ${g.sprays} بخة</span></div>`).join('')}</div>`;
     }
     function membersView() {
       const q = (search.value || '').trim();
-      const rows = members.filter(m => m.name.includes(q));
-      return `<table>
-        <thead><tr><th></th><th>الحالة</th><th>الاسم</th><th>الدور</th><th>البخات</th><th></th></tr></thead>
-        <tbody>${rows.map(m => `<tr>
-          <td><button class="manage">إدارة</button></td>
+      return `<table><thead><tr><th></th><th>الحالة</th><th>الاسم</th><th>الدور</th><th>البخات</th></tr></thead><tbody>
+        ${members.filter(m => m.name.includes(q)).map(m => `<tr>
+          <td><button class="manage" data-act="member">إدارة</button></td>
           <td class="${m.on?'on':'off'}">${m.on?'● متصل':'○ غير متصل'}</td>
-          <td><b>${m.name}</b></td>
-          <td><span class="pill">${m.role}</span></td>
-          <td>${m.sprays}</td>
-          <td></td>
+          <td><b>${m.name}</b></td><td><span class="pill">${m.role}</span></td><td>${m.sprays}</td>
         </tr>`).join('')}</tbody></table>`;
+    }
+    function mapView() {
+      return `<div class="gta-map">
+        <div class="land"></div>
+        <div class="road" style="left:18%;top:46%;width:62%;height:6px;--r:-8deg"></div>
+        <div class="road" style="left:40%;top:18%;width:6px;height:64%;--r:6deg"></div>
+        <div class="road" style="left:22%;top:62%;width:50%;height:5px;--r:12deg"></div>
+        ${zones.map(z => `<div class="zone" style="left:${z.x};top:${z.y};--c:${z.c};--s:${z.s}">
+          <span class="dot"></span>
+          <span class="lab">${z.name}<br><span class="tag">${z.owner}</span></span>
+        </div>`).join('')}
+        <div class="legend"><b>مناطق العصابات</b>
+          ${zones.map(z => `<div><i style="background:${z.c}"></i> ${z.name} — ${z.owner}</div>`).join('')}
+        </div>
+      </div>
+      <p class="hint">خريطة لوس سانتوس: كل دائرة تيرف عصابة. اللون = العصابة المسيطرة. الفاضي بدون سيطرة.</p>`;
     }
     const views = {
       home: () => `<div class="cards">
-          <div class="card">النقاط<b>35135</b></div>
-          <div class="card">البخات<b>12</b></div>
-          <div class="card">الترتيب<b>#1</b></div>
+          <div class="card">النقاط<b class="big">35135</b></div>
+          <div class="card">البخات<b class="big">12</b></div>
+          <div class="card">الترتيب<b class="big">#1</b></div>
         </div>
-        <div class="card">عصابة <b style="font-size:20px;color:#fff">آل فخامة · DARK</b><p style="color:var(--muted);margin-top:8px">اللون أحمر · الأيقونة بانتظار موافقة الإدارة</p></div>`,
+        <div class="card">عصابة <b>آل فخامة · DARK</b><p class="xp">اللون أحمر · الأيقونة بانتظار موافقة الإدارة</p></div>`,
       members: membersView,
-      guest: () => `<div class="card"><p>دعوة ضيف مؤقت بكود أو آيدي السيرفر.</p><br/><input class="search" id="gid" placeholder="آيدي اللاعب" /> <button class="btn" style="margin-right:8px">دعوة</button></div>`,
+      guest: () => `<div class="card"><p>دعوة ضيف مؤقت (مو عضو كامل).</p>
+        <input class="inp" placeholder="آيدي اللاعب" /><button class="btn" data-act="guest">دعوة</button>
+        <div class="log" style="margin-top:12px">ضيف تجريبي <button class="manage" data-act="kickg">إزالة</button></div></div>`,
       rankings: podium,
-      map: () => `<div class="zones">
-        ${['قروف ستريت','ديفيس','ساندي شورز','باليتو باي'].map((z,i)=>`<div class="zone"><b>${z}</b><div class="xp">${i===0?'المسيطر: آل فخامة':'فاضي'}</div></div>`).join('')}
-      </div>`,
-      summon: () => `<div class="card"><p>استدعاء كامل لكل أعضاء العصابة الأونلاين مع علامة على الخريطة وGPS.</p><br/><button class="btn">استدعاء العصابة كلها</button></div>`,
-      logs: () => `<div class="log"><b>سجل البخ</b><div class="xp">حمود · نص · قروف ستريت · الآن</div></div>
-        <div class="log"><b>سجل النشاط</b><div class="xp">أدمن عيّن قائد · حمود</div></div>
-        <p class="xp">السجلات لليدر والإدارة فقط.</p>`
+      map: mapView,
+      summon: () => `<div class="card"><p>استدعاء كامل لكل الأعضاء الأونلاين. علامة على خريطة اللعبة + GPS عند القبول.</p>
+        <p class="hint">للملازم والرتب الأعلى.</p><button class="btn" data-act="summon">استدعاء العصابة كلها</button></div>`,
+      spray: () => `<div class="card"><p>وضعين: رسم حر أو كتابة. بدون رفع صور. الكلام الوسخ ينحجب.</p>
+        <button class="btn2" id="mfree">ارسم</button> <button class="btn2" id="mtext">اكتب</button>
+        <canvas id="cv" width="900" height="280"></canvas>
+        <input class="inp hidden" id="stxt" placeholder="النص على الجدار" maxlength="28" />
+        <button class="btn" data-act="spray">بخ</button> <button class="btn2" data-act="cancel">إلغاء</button></div>`,
+      notifs: () => `<div class="log">استدعاء كامل من القائد — الآن</div>
+        <div class="log">خصم بخ على أرضكم (قروف ستريت)</div>
+        <div class="log">الأدمن وافق على أيقونة العصابة</div>
+        <div class="log">تغيّر الترتيب: صرتوا #1</div>`,
+      logs: () => `<div class="card"><b>سجل البخ</b><p class="hint">ليدر وإدارة فقط</p>
+        <div class="log">حمود · نص · قروف ستريت · الآن <button class="manage" data-act="dels">حذف</button></div>
+        <div class="log">سالم · رسم حر · ديفيس · أمس <button class="manage" data-act="dels">حذف</button></div></div>
+        <div class="card"><b>سجل النشاط</b>
+        <div class="log">أدمن · إنشاء عصابة · آل فخامة</div>
+        <div class="log">قائد · استدعاء كامل</div>
+        <div class="log">أدمن · قبول أيقونة</div></div>`,
+      leader: () => `<div class="grid2">
+        <div class="card"><b>المقر واللون</b><p class="hint">تعيين المقر على موقعك الحالي</p>
+          <button class="btn" data-act="hq">تعيين المقر هنا</button>
+          <p class="hint">لون العصابة</p>
+          ${['#e74c3c','#27ae60','#3498db','#e2b039','#9b59b6'].map(c=>`<button class="swatch" style="background:${c}" data-act="color"></button>`).join(' ')}
+        </div>
+        <div class="card"><b>أيقونة الخريطة</b><p class="hint">تختارها أنت، وما تظهر إلا بعد موافقة الإدارة</p>
+          <select class="inp"><option>عصابة</option><option>جمجمة</option><option>تاج</option><option>سلاح</option></select>
+          <button class="btn" data-act="icon">طلب الأيقونة</button></div>
+        </div>
+        <div class="card"><b>إعلان للأعضاء</b><input class="inp" placeholder="نص الإعلان" /><button class="btn" data-act="ann">إرسال</button></div>
+        <div class="card"><b>الأعضاء والرتب</b>
+          ${members.map(m=>`<div class="log">${m.name} · ${m.role}
+            <button class="btn2" data-act="up">ترقية</button>
+            <button class="btn2" data-act="down">تنزيل</button>
+            <button class="manage" data-act="kick">طرد</button></div>`).join('')}
+          <button class="btn no" data-act="wipe">مسح بخاخات العصابة</button>
+        </div>`,
+      admin: () => `<div class="grid2">
+        <div class="card"><b>إنشاء عصابة</b>
+          <input class="inp" placeholder="الاسم" /><input class="inp" placeholder="الوسم" />
+          <button class="btn" data-act="create">إنشاء</button></div>
+        <div class="card"><b>تعديل عصابة</b>
+          <select class="inp">${gangs.map(g=>`<option>${g.name}</option>`).join('')}</select>
+          <input class="inp" placeholder="آيدي ليدر / عضو" />
+          <button class="btn" data-act="setl">تعيين ليدر</button>
+          <button class="btn2" data-act="addl">إضافة عضو</button>
+          <button class="btn no" data-act="delg">حذف العصابة</button></div>
+        </div>
+        <div class="card"><b>أيقونات معلّقة — موافقة الإدارة</b>
+          <div class="log">آل فخامة: جمجمة → تاج
+            <button class="btn ok" data-act="yes">موافقة</button>
+            <button class="btn no" data-act="no">رفض</button></div></div>
+        <div class="card"><b>كل البخاخات</b>
+          <div class="log">آل فخامة · حمود · قروف ستريت <button class="manage" data-act="dels">حذف</button></div>
+          <button class="btn no" data-act="wipeall">مسح كل البخاخات</button></div>`
     };
+    function bindSpray() {
+      const cv = document.getElementById('cv'); if (!cv) return;
+      const ctx = cv.getContext('2d'); let draw = false;
+      cv.onpointerdown = e => { draw = true; const r = cv.getBoundingClientRect(); ctx.beginPath(); ctx.moveTo((e.clientX-r.left)*cv.width/r.width,(e.clientY-r.top)*cv.height/r.height); cv.setPointerCapture(e.pointerId); };
+      cv.onpointermove = e => { if (!draw) return; const r = cv.getBoundingClientRect(); ctx.strokeStyle = '#e74c3c'; ctx.lineWidth = 4; ctx.lineCap = 'round'; ctx.lineTo((e.clientX-r.left)*cv.width/r.width,(e.clientY-r.top)*cv.height/r.height); ctx.stroke(); };
+      cv.onpointerup = () => draw = false;
+      document.getElementById('mtext').onclick = () => document.getElementById('stxt').classList.remove('hidden');
+      document.getElementById('mfree').onclick = () => document.getElementById('stxt').classList.add('hidden');
+    }
     function render() {
       title.textContent = pages.find(p => p[0]===page)[1];
       search.classList.toggle('hidden', page !== 'members');
       renderNav();
       view.innerHTML = views[page]();
+      if (page === 'spray') bindSpray();
     }
     nav.addEventListener('click', e => {
-      const b = e.target.closest('button[data-id]');
-      if (!b) return;
-      page = b.dataset.id;
-      render();
+      const b = e.target.closest('button[data-id]'); if (!b) return;
+      page = b.dataset.id; render();
+    });
+    view.addEventListener('click', e => {
+      const b = e.target.closest('[data-act]'); if (!b) return;
+      toast('تم (هذا عرض شكل — يشتغل كامل داخل اللعبة)');
     });
     search.addEventListener('input', () => { if (page==='members') view.innerHTML = membersView(); });
     render();
