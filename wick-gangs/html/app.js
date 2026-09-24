@@ -44,11 +44,13 @@ function navItems() {
     ['rankings', 'rankings'],
     ['members', 'members'],
     ['summon', 'summon'],
-    ['guest', 'guest'],
-    ['notifs', 'notifs']
+    ['guest', 'guest']
   ];
-  if (S.isLeader) items.push(['spraylog', 'spray_log'], ['leader', 'leader']);
-  if (S.isAdmin) items.push(['admin', 'admin']);
+  if (S.isLeader) items.push(['spraylog', 'spray_log'], ['activity', 'activity_log'], ['leader', 'leader']);
+  if (S.isAdmin) {
+    if (!S.isLeader) items.push(['spraylog', 'spray_log'], ['activity', 'activity_log']);
+    items.push(['admin', 'admin']);
+  }
   return items;
 }
 
@@ -81,7 +83,7 @@ function home() {
     <div>${esc(g.label)} <span class="muted">${esc(g.tag)}</span></div>
     <div class="muted">${t('points')}: ${g.points || 0} · ${t('spray')}: ${g.sprays || 0}</div>
     <div class="muted">${t('icon')}: ${esc(iconLabel(g.icon))}
-      ${g.pendingIcon ? ' · ' + t('pending') + ': ' + esc(iconLabel(g.pendingIcon)) : ''}</div>
+      ${(S.isLeader || S.isAdmin) && g.pendingIcon ? ' · ' + t('pending') + ': ' + esc(iconLabel(g.pendingIcon)) : ''}</div>
   </div>`;
 }
 
@@ -130,16 +132,20 @@ function guest() {
   return html;
 }
 
-function notifs() {
-  return (S.notifs || []).map((n) => `<div class="card">
-    <div>${esc(n.title)}</div>
-    <div class="muted">${esc(n.message)} · ${esc(n.created_at || '')}</div>
-  </div>`).join('') || `<div class="card">${t('no_notifs')}</div>`;
+function activity() {
+  if (!S.isLeader && !S.isAdmin) return '';
+  const rows = S.activityLog || [];
+  if (!rows.length) return `<div class="card">${t('no_activity')}</div>`;
+  return rows.map((r) => `<div class="card">
+    <div>${esc(t('act_' + r.action) === 'act_' + r.action ? r.action : t('act_' + r.action))}</div>
+    <div class="muted">${esc(r.actor_name || '')} · ${esc(r.detail || '')}${r.gang_label ? ' · ' + esc(r.gang_label) : ''}</div>
+    <div class="muted">${esc(r.created_at || '')}</div>
+  </div>`).join('');
 }
 
 function spraylog() {
   if (!S.isLeader && !S.isAdmin) return '';
-  const rows = S.sprayLog || [];
+  const rows = S.isAdmin ? (S.adminSprays || S.sprayLog || []) : (S.sprayLog || []);
   if (!rows.length) return `<div class="card">${t('no_log')}</div>`;
   return rows.map((r) => `<div class="card">
     <div>${esc(r.player_name)} · ${r.mode === 'text' ? t('mode_text') : t('mode_free')}</div>
@@ -195,6 +201,7 @@ function admin() {
       <select id="g-sel">${gangs}</select>
       <input id="g-sid" placeholder="ID"/>
       <button id="g-leader">${t('set_leader')}</button>
+      <button id="g-clear-leader">${t('clear_leader')}</button>
       <button id="g-add">${t('add_member')}</button>
       <button id="g-del">${t('delete_gang')}</button>
       <button id="g-wipe">${t('wipe_gang_sprays')}</button>
@@ -206,7 +213,7 @@ function admin() {
     <h4>${t('all_sprays')}</h4>${logs}`;
 }
 
-const views = { home, places, rankings, members, summon, guest, notifs, spraylog, leader, admin };
+const views = { home, places, rankings, members, summon, guest, spraylog, activity, leader, admin };
 
 function render() {
   const g = S.gang;
@@ -268,6 +275,10 @@ $('page').onclick = (e) => {
   }
   if (e.target.id === 'g-leader') {
     post('action', { a: 'adminSetLeader', gangId: $('g-sel').value, id: $('g-sid').value });
+    setTimeout(() => post('refresh'), 250);
+  }
+  if (e.target.id === 'g-clear-leader') {
+    post('action', { a: 'adminClearLeader', gangId: $('g-sel').value });
     setTimeout(() => post('refresh'), 250);
   }
   if (e.target.id === 'g-add') {
@@ -394,7 +405,9 @@ if (MOCK) {
   const strings = {
     tablet_title: 'تابلت العصابة', close: 'إغلاق', home: 'الرئيسية', places: 'الأماكن',
     points: 'النقاط', rankings: 'الترتيب', members: 'الأعضاء', summon: 'استدعاء كامل',
-    guest: 'ضيف', notifs: 'تنويهات', spray_log: 'سجل البخ', leader: 'القائد', admin: 'أدمن',
+    guest: 'ضيف',
+    activity_log: 'سجل النشاط', no_activity: 'ما في نشاط.', clear_leader: 'إزالة القائد',
+    spray_log: 'سجل البخ', leader: 'القائد', admin: 'أدمن',
     spray: 'بخاخ', online: 'أونلاين', offline: 'أوفلاين', guest_tag: 'ضيف',
     owner: 'المسيطر', none: 'فاضي', send_summon: 'استدعاء العصابة كلها',
     summon_hint: 'كل الأعضاء الأونلاين ياخذون علامة على الخريطة.',
@@ -409,7 +422,8 @@ if (MOCK) {
     spray_ok: 'بخ', spray_cancel: 'إلغاء', text_placeholder: 'النص على الجدار',
     accept: 'قبول', ignore: 'تجاهل', summon_banner: 'استدعاء كامل للعصابة',
     lang: 'EN / عربي', name: 'الاسم', label: 'العنوان', tag: 'الوسم', no_log: 'ما في بخاخات',
-    no_notifs: 'ما في تنويهات', not_member: 'أنت مو في عصابة.', summon_need_rank: 'رتبتك ما تكفي.'
+    act_create_gang: 'إنشاء عصابة', act_set_leader: 'تعيين قائد', act_summon: 'استدعاء كامل',
+    act_icon_approve: 'قبول أيقونة', act_guest_invite: 'دعوة ضيف',
   };
   const isLeader = location.search.indexOf('member=1') === -1;
   const isAdmin = location.search.indexOf('member=1') === -1;
@@ -425,8 +439,8 @@ if (MOCK) {
       { identifier: 'b', name: 'سالم', rank: 1, rankLabel: 'عضو', online: false }
     ],
     guests: [{ identifier: 'c', name: 'ضيف تجريبي' }],
-    notifs: [{ title: 'استدعاء كامل', message: 'حمود', created_at: 'الآن' }],
-    sprayLog: [{ id: 1, player_name: 'حمود', mode: 'text', text_content: 'WLF', x: 1, y: 2, created_at: 'الآن' }],
+    sprayLog: isLeader ? [{ id: 1, player_name: 'حمود', mode: 'text', text_content: 'WLF', x: 1, y: 2, created_at: 'الآن' }] : null,
+    activityLog: isLeader ? [{ actor_name: 'أدمن', action: 'set_leader', detail: 'حمود', created_at: 'الآن' }, { actor_name: 'حمود', action: 'summon', detail: 'حمود', created_at: 'الآن' }] : null,
     adminSprays: [{ id: 1, gang_label: 'الذيب', player_name: 'حمود', mode: 'freehand', created_at: 'الآن' }],
     pendingIcons: [{ id: 1, label: 'الذيب', current: 'skull', pending: 'crown' }],
     gangs: [{ id: 1, label: 'الذيب' }]

@@ -176,8 +176,8 @@ RegisterNetEvent('wick_gangs:saveSpray', function(payload)
         WG.AddInfluence(zoneId, gang.id, 6)
         local st = WG.ZoneState[zoneId]
         if st and st.owner_gang_id and st.owner_gang_id ~= gang.id then
-            WG.PushNotif(st.owner_gang_id, 'rival_spray', _L('spray'), gang.label)
             MySQL.update.await('UPDATE wick_gangs SET points = GREATEST(points - 2, 0) WHERE id = ?', { st.owner_gang_id })
+            WG.NotifyLeaders(st.owner_gang_id, 'rival_spray')
         end
     end
     MySQL.update.await('UPDATE wick_gangs SET points = points + ?, spray_count = spray_count + 1 WHERE id = ?', { pts, gang.id })

@@ -2,7 +2,7 @@
 
 Lightweight **ESX** gang resource: tablet, full gang summon, rankings, map blips, leader/admin menus, and gang-only wall spray.
 
-This folder is a drop-in FiveM resource. It does not change the Discord broadcast bot in the repo root.
+Standalone FiveM resource. **No Discord** — no webhooks, no bot, no off-tablet logging. All logs live in the tablet (leader and admin only).
 
 ## Install
 
@@ -41,9 +41,12 @@ Tables are created automatically on start.
 - Arabic + English profanity is blocked on the server. Rejected text never paints.
 - Nearby players see tags (lines / 3D text). Not a per-tag DUI.
 
-## Spray log (leader + admin only)
+## Tablet logs (leader + admin only)
 
-Members can spray. They **cannot** see who/where/when. Leader sees that gang’s list and can delete. Admin sees all gangs and can delete any.
+Nothing is sent to Discord. Regular members cannot open these lists; the server does not send them.
+
+1. **Spray log** — who / where / when / freehand vs text. Leader deletes own gang tags. Admin sees all gangs and can delete any.
+2. **Activity log** — create/delete gang, set/remove leader, member add/kick/rank, full summon, icon approve/reject, guest invite/remove.
 
 ## Blips
 
@@ -54,7 +57,7 @@ Members can spray. They **cannot** see who/where/when. Leader sees that gang’s
 | Active summon | That gang only |
 | Spray wall markers | Leader + admin only |
 
-Map icon: leader picks from a list → **admin approve/reject**. Until approved, the old/default icon stays. Reject notifies the leader in the tablet.
+Map icon: leader picks from a list → **admin approve/reject**. Until approved, the old/default icon stays. Reject notifies the leader in the tablet (and is written to the activity log).
 
 ## Ranks
 

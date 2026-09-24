@@ -122,27 +122,33 @@ function WG.AddInfluence(zoneId, gangId, amount)
     WG.SaveZone(zoneId)
     if prev ~= st.owner_gang_id then
         WG.RefreshBlipsAll()
-        local g = WG.Gangs[st.owner_gang_id]
-        if g then
-            WG.PushNotif(st.owner_gang_id, 'ranking', _L('rankings'), (g.label or '') .. ' / ' .. zoneId)
-        end
     end
 end
 
-function WG.PushNotif(gangId, typ, title, message)
-    if not gangId then return end
+function WG.LogActivity(src, gangId, action, detail)
+    local xP = src and ESX.GetPlayerFromId(src) or nil
+    local name = 'console'
+    local ident = ''
+    if xP then
+        ident = xP.identifier or ''
+        name = xP.getName and xP.getName() or GetPlayerName(src)
+    elseif src then
+        name = GetPlayerName(src) or 'player'
+    end
     MySQL.insert.await(
-        'INSERT INTO wick_gang_notifications (gang_id, type, title, message) VALUES (?, ?, ?, ?)',
-        { gangId, typ or 'info', title or '', message or '' }
+        'INSERT INTO wick_gang_activity (gang_id, actor, actor_name, action, detail) VALUES (?, ?, ?, ?, ?)',
+        { gangId, ident, name, action or 'info', tostring(detail or ''):sub(1, 180) }
     )
     MySQL.update.await(
-        'DELETE FROM wick_gang_notifications WHERE gang_id = ? AND created_at < DATE_SUB(NOW(), INTERVAL 7 DAY)',
-        { gangId }
+        'DELETE FROM wick_gang_activity WHERE created_at < DATE_SUB(NOW(), INTERVAL 14 DAY)'
     )
-    for ident, src in pairs(WG.Online) do
-        local m = WG.Members[ident]
-        if m and m.gang_id == gangId then
-            TriggerClientEvent('wick_gangs:toast', src, title)
+end
+
+function WG.NotifyLeaders(gangId, key)
+    for ident, m in pairs(WG.Members) do
+        if m.gang_id == gangId and WG.IsLeader(m) then
+            local t = WG.Online[ident]
+            if t then WG.Notify(t, key) end
         end
     end
 end
@@ -313,8 +319,8 @@ function WG.BuildTablet(src, lang)
         rankings = WG.Rankings(),
         members = {},
         guests = {},
-        notifs = {},
         sprayLog = nil,
+        activityLog = nil,
         adminSprays = nil,
         pendingIcons = nil,
         gangs = nil,
@@ -332,7 +338,7 @@ function WG.BuildTablet(src, lang)
             color = gang.color,
             hex = col.hex,
             icon = gang.icon,
-            pendingIcon = gang.pending_icon,
+            pendingIcon = (isLeader or admin) and gang.pending_icon or nil,
             points = gang.points,
             sprays = gang.spray_count
         }
@@ -340,14 +346,14 @@ function WG.BuildTablet(src, lang)
         for _, m in ipairs(payload.members) do
             if m.guest then payload.guests[#payload.guests + 1] = m end
         end
-        payload.notifs = MySQL.query.await(
-            'SELECT id, type, title, message, created_at FROM wick_gang_notifications WHERE gang_id = ? ORDER BY id DESC LIMIT 25',
-            { gang.id }
-        ) or {}
     end
     if isLeader and gang then
         payload.sprayLog = MySQL.query.await(
             'SELECT id, player_name, mode, text_content, x, y, z, zone_id, created_at FROM wick_gang_sprays WHERE gang_id = ? ORDER BY id DESC LIMIT 40',
+            { gang.id }
+        ) or {}
+        payload.activityLog = MySQL.query.await(
+            'SELECT id, gang_id, actor_name, action, detail, created_at FROM wick_gang_activity WHERE gang_id = ? ORDER BY id DESC LIMIT 40',
             { gang.id }
         ) or {}
     end
@@ -369,6 +375,9 @@ function WG.BuildTablet(src, lang)
                 }
             end
         end
+        payload.activityLog = MySQL.query.await(
+            'SELECT a.id, a.gang_id, a.actor_name, a.action, a.detail, a.created_at, g.label AS gang_label FROM wick_gang_activity a LEFT JOIN wick_gangs g ON g.id = a.gang_id ORDER BY a.id DESC LIMIT 80'
+        ) or {}
     end
     return payload
 end
@@ -445,7 +454,7 @@ RegisterNetEvent('wick_gangs:action', function(action, data)
                 end
             end
         end
-        WG.PushNotif(gang.id, 'summon', _L('summon_banner'), payload.caller)
+        WG.LogActivity(src, gang.id, 'summon', payload.caller)
         WG.Notify(src, 'summon_sent')
 
     elseif action == 'inviteGuest' then
@@ -462,22 +471,25 @@ RegisterNetEvent('wick_gangs:action', function(action, data)
             'INSERT INTO wick_gang_members (gang_id, identifier, name, rank, is_guest, guest_until) VALUES (?, ?, ?, 1, 1, ?)',
             { gang.id, target.identifier, target.getName and target.getName() or GetPlayerName(target.source), os.time() + Config.GuestMinutes * 60 }
         )
+        local gname = target.getName and target.getName() or GetPlayerName(target.source)
         WG.Reload()
-        WG.PushNotif(gang.id, 'guest', _L('guest'), target.getName and target.getName() or '')
+        WG.LogActivity(src, gang.id, 'guest_invite', gname)
         WG.Notify(src, 'guest_invited')
         WG.RefreshBlips(target.source)
 
     elseif action == 'removeGuest' then
         if not WG.IsLeader(member) then return WG.Notify(src, 'not_leader') end
+        local gmember = WG.Members[data.identifier]
         MySQL.update.await('DELETE FROM wick_gang_members WHERE identifier = ? AND gang_id = ? AND is_guest = 1', { data.identifier, gang.id })
         WG.Reload()
+        WG.LogActivity(src, gang.id, 'guest_remove', gmember and gmember.name or tostring(data.identifier or ''))
         WG.Notify(src, 'guest_removed')
 
     elseif action == 'announce' then
         if not WG.IsLeader(member) then return WG.Notify(src, 'not_leader') end
         local msg = tostring(data.text or ''):sub(1, 120)
         if msg == '' or WGBanned(msg) then return WG.Notify(src, 'banned_text') end
-        WG.PushNotif(gang.id, 'announce', _L('announce'), msg)
+        WG.LogActivity(src, gang.id, 'announce', msg)
 
     elseif action == 'setHQ' then
         if not WG.IsLeader(member) then return WG.Notify(src, 'not_leader') end
@@ -500,7 +512,7 @@ RegisterNetEvent('wick_gangs:action', function(action, data)
         MySQL.update.await('UPDATE wick_gangs SET pending_icon = ? WHERE id = ?', { ic.id, gang.id })
         WG.Reload()
         WG.Notify(src, 'icon_pending')
-        WG.PushNotif(gang.id, 'admin', _L('pending'), ic.id)
+        WG.LogActivity(src, gang.id, 'icon_request', ic.id)
 
     elseif action == 'setRank' then
         if not WG.IsLeader(member) then return WG.Notify(src, 'not_leader') end
@@ -508,13 +520,17 @@ RegisterNetEvent('wick_gangs:action', function(action, data)
         if rank < 1 then rank = 1 end
         if rank > 4 then rank = 4 end
         MySQL.update.await('UPDATE wick_gang_members SET rank = ? WHERE identifier = ? AND gang_id = ? AND is_guest = 0', { rank, data.identifier, gang.id })
+        local named = WG.Members[data.identifier]
         WG.Reload()
+        WG.LogActivity(src, gang.id, 'set_rank', (named and named.name or '') .. ' ' .. tostring(rank))
 
     elseif action == 'kick' then
         if not WG.IsLeader(member) then return WG.Notify(src, 'not_leader') end
         if data.identifier == member.identifier then return end
+        local named = WG.Members[data.identifier]
         MySQL.update.await('DELETE FROM wick_gang_members WHERE identifier = ? AND gang_id = ?', { data.identifier, gang.id })
         WG.Reload()
+        WG.LogActivity(src, gang.id, 'kick', named and named.name or tostring(data.identifier or ''))
         WG.Notify(src, 'member_removed')
 
     elseif action == 'deleteSpray' then
@@ -545,20 +561,22 @@ RegisterNetEvent('wick_gangs:action', function(action, data)
         local label = tostring(data.label or name):sub(1, 40)
         local tag = tostring(data.tag or ''):sub(1, 6)
         if name == '' then return end
-        MySQL.insert.await(
+        local newId = MySQL.insert.await(
             'INSERT INTO wick_gangs (name, label, tag, color, icon) VALUES (?, ?, ?, ?, ?)',
             { name, label, tag, (WGColor(data.color).id), Config.DefaultIcon }
         )
         WG.Reload()
+        WG.LogActivity(src, newId, 'create_gang', label)
         WG.Notify(src, 'gang_created')
 
     elseif action == 'adminDelete' then
         if not admin then return WG.Notify(src, 'not_admin') end
         local gid = tonumber(data.gangId)
         if not gid then return end
+        local gone = WG.Gangs[gid]
+        WG.LogActivity(src, gid, 'delete_gang', gone and gone.label or tostring(gid))
         WG.WipeGangSprays(gid)
         MySQL.update.await('DELETE FROM wick_gang_members WHERE gang_id = ?', { gid })
-        MySQL.update.await('DELETE FROM wick_gang_notifications WHERE gang_id = ?', { gid })
         MySQL.update.await('DELETE FROM wick_gangs WHERE id = ?', { gid })
         WG.Reload()
         WG.Notify(src, 'gang_deleted')
@@ -581,7 +599,7 @@ RegisterNetEvent('wick_gangs:action', function(action, data)
         end
         MySQL.update.await('UPDATE wick_gangs SET leader = ? WHERE id = ?', { target.identifier, gid })
         WG.Reload()
-        WG.PushNotif(gid, 'admin', _L('leader'), target.getName and target.getName() or '')
+        WG.LogActivity(src, gid, 'set_leader', target.getName and target.getName() or GetPlayerName(target.source))
         WG.Notify(src, 'leader_set')
         WG.RefreshBlips(target.source)
 
@@ -592,6 +610,7 @@ RegisterNetEvent('wick_gangs:action', function(action, data)
         MySQL.update.await('UPDATE wick_gangs SET leader = NULL WHERE id = ?', { gid })
         MySQL.update.await('UPDATE wick_gang_members SET rank = 4 WHERE gang_id = ? AND rank = 5', { gid })
         WG.Reload()
+        WG.LogActivity(src, gid, 'clear_leader', '')
         WG.Notify(src, 'leader_set')
 
     elseif action == 'adminAddMember' then
@@ -608,14 +627,17 @@ RegisterNetEvent('wick_gangs:action', function(action, data)
             )
         end
         WG.Reload()
-        WG.PushNotif(gid, 'admin', _L('member_added'), target.getName and target.getName() or '')
+        WG.LogActivity(src, gid, 'add_member', target.getName and target.getName() or GetPlayerName(target.source))
         WG.Notify(src, 'member_added')
         WG.RefreshBlips(target.source)
 
     elseif action == 'adminRemoveMember' then
         if not admin then return WG.Notify(src, 'not_admin') end
+        local named = WG.Members[data.identifier]
+        local gid = named and named.gang_id or nil
         MySQL.update.await('DELETE FROM wick_gang_members WHERE identifier = ?', { data.identifier })
         WG.Reload()
+        WG.LogActivity(src, gid, 'remove_member', named and named.name or tostring(data.identifier or ''))
         WG.Notify(src, 'member_removed')
         WG.RefreshBlipsAll()
 
@@ -625,16 +647,17 @@ RegisterNetEvent('wick_gangs:action', function(action, data)
         local pts = tonumber(data.points) or 0
         MySQL.update.await('UPDATE wick_gangs SET points = ? WHERE id = ?', { pts, gid })
         WG.Reload()
-        WG.PushNotif(gid, 'points', _L('points'), tostring(pts))
 
     elseif action == 'approveIcon' then
         if not admin then return WG.Notify(src, 'not_admin') end
         local gid = tonumber(data.gangId)
         local g = gid and WG.Gangs[gid]
         if not g or not g.pending_icon then return end
+        local iconId = g.pending_icon
         MySQL.update.await('UPDATE wick_gangs SET icon = pending_icon, pending_icon = NULL WHERE id = ?', { gid })
         WG.Reload()
-        WG.PushNotif(gid, 'admin', _L('icon_approved'), g.pending_icon)
+        WG.LogActivity(src, gid, 'icon_approve', iconId)
+        WG.NotifyLeaders(gid, 'icon_approved')
         WG.RefreshBlipsAll()
 
     elseif action == 'rejectIcon' then
@@ -644,7 +667,8 @@ RegisterNetEvent('wick_gangs:action', function(action, data)
         if not g then return end
         MySQL.update.await('UPDATE wick_gangs SET pending_icon = NULL WHERE id = ?', { gid })
         WG.Reload()
-        WG.PushNotif(gid, 'admin', _L('icon_rejected'), g.icon or Config.DefaultIcon)
+        WG.LogActivity(src, gid, 'icon_reject', g.icon or Config.DefaultIcon)
+        WG.NotifyLeaders(gid, 'icon_rejected')
 
     elseif action == 'wipeAllSprays' then
         if not admin then return WG.Notify(src, 'not_admin') end

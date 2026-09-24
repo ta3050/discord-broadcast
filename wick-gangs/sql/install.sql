@@ -57,6 +57,17 @@ CREATE TABLE IF NOT EXISTS wick_gang_notifications (
     INDEX gang_idx (gang_id)
 );
 
+CREATE TABLE IF NOT EXISTS wick_gang_activity (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    gang_id INT NULL,
+    actor VARCHAR(80) NOT NULL DEFAULT '',
+    actor_name VARCHAR(80) NOT NULL DEFAULT '',
+    action VARCHAR(32) NOT NULL DEFAULT 'info',
+    detail VARCHAR(180) NOT NULL DEFAULT '',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX gang_idx (gang_id)
+);
+
 CREATE TABLE IF NOT EXISTS wick_gang_zone_state (
     zone_id VARCHAR(32) PRIMARY KEY,
     owner_gang_id INT NULL,
