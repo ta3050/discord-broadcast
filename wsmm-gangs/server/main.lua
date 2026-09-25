@@ -1,0 +1,989 @@
+-- WSMM GANGS. Copyright (c) 2026 WSMM GANGS.
+ESX = nil
+WG = WG or {}
+WG.Gangs = {}
+WG.Members = {}
+WG.ZoneState = {}
+WG.Online = {}
+
+local summonCd = {}
+
+local function waitESX()
+    while ESX == nil do
+        if GetResourceState('es_extended') == 'started' then
+            local ok, obj = pcall(function()
+                return exports['es_extended']:getSharedObject()
+            end)
+            if ok and obj then
+                ESX = obj
+                break
+            end
+        end
+        TriggerEvent('esx:getSharedObject', function(obj) ESX = obj end)
+        Wait(150)
+    end
+end
+
+local function players()
+    if ESX.GetExtendedPlayers then
+        return ESX.GetExtendedPlayers()
+    end
+    local out = {}
+    for _, id in ipairs(ESX.GetPlayers()) do
+        out[#out + 1] = ESX.GetPlayerFromId(id)
+    end
+    return out
+end
+
+function WG.IsAdmin(src)
+    if IsPlayerAceAllowed(src, 'wsmmgangs.admin') then return true end
+    local xP = ESX.GetPlayerFromId(src)
+    if not xP then return false end
+    local g = xP.getGroup and xP.getGroup() or 'user'
+    return Config.AdminGroups[g] == true
+end
+
+function WG.GetXP(src)
+    return ESX.GetPlayerFromId(src)
+end
+
+function WG.MemberOf(src)
+    local xP = ESX.GetPlayerFromId(src)
+    if not xP then return nil, nil end
+    return WG.Members[xP.identifier], xP
+end
+
+function WG.IsLeader(member)
+    if not member or member.is_guest == 1 then return false end
+    if (member.rank or 0) >= 5 then return true end
+    local g = WG.Gangs[member.gang_id]
+    return g and g.leader == member.identifier
+end
+
+local function hasPendingIcon(g)
+    if not g then return false end
+    return (g.pending_icon and g.pending_icon ~= '')
+        or (g.pending_icon_image and g.pending_icon_image ~= '')
+end
+
+-- Leader of the gang, or admin acting on a gang they entered / selected.
+local function iconEditGang(member, admin, data)
+    local gid = tonumber(data and data.gangId)
+    if admin and gid and WG.Gangs[gid] then
+        return WG.Gangs[gid]
+    end
+    if WG.IsLeader(member) and member then
+        return WG.Gangs[member.gang_id]
+    end
+    if admin and member and WG.Gangs[member.gang_id] then
+        return WG.Gangs[member.gang_id]
+    end
+    return nil
+end
+
+function WG.SavePendingIcon(src, data)
+    local member = select(1, WG.MemberOf(src))
+    local admin = WG.IsAdmin(src)
+    local g = iconEditGang(member, admin, data)
+    if not g then
+        WG.Notify(src, admin and 'not_admin' or 'not_leader')
+        return
+    end
+    local url = WGSanitizeIconDataUrl(data and (data.image or data.dataUrl))
+    if not url then
+        WG.Notify(src, 'icon_bad_type')
+        return
+    end
+    MySQL.update.await('UPDATE wsmm_gangs SET pending_icon_image = ? WHERE id = ?', { url, g.id })
+    WG.Reload()
+    WG.Notify(src, 'icon_pending')
+    WG.LogActivity(src, g.id, 'icon_request', 'image')
+end
+
+function WG.Notify(src, key)
+    TriggerClientEvent('wsmm_gangs:toast', src, _L(key))
+end
+
+function WG.Reload()
+    WG.Gangs = {}
+    for _, r in ipairs(MySQL.query.await('SELECT * FROM wsmm_gangs') or {}) do
+        local img = WGSanitizeIconDataUrl(r.icon_image)
+        local pend = WGSanitizeIconDataUrl(r.pending_icon_image)
+        if (r.icon_image or '') ~= '' and not img then
+            MySQL.update.await('UPDATE wsmm_gangs SET icon_image = NULL WHERE id = ?', { r.id })
+        end
+        if (r.pending_icon_image or '') ~= '' and not pend then
+            MySQL.update.await('UPDATE wsmm_gangs SET pending_icon_image = NULL WHERE id = ?', { r.id })
+        end
+        r.icon_image = img
+        r.pending_icon_image = pend
+        WG.Gangs[r.id] = r
+    end
+    WG.Members = {}
+    local now = os.time()
+    for _, r in ipairs(MySQL.query.await('SELECT * FROM wsmm_gang_members') or {}) do
+        if r.is_guest == 1 and r.guest_until > 0 and now > r.guest_until then
+            MySQL.update.await('DELETE FROM wsmm_gang_members WHERE id = ?', { r.id })
+        else
+            WG.Members[r.identifier] = r
+        end
+    end
+end
+
+function WG.LoadCustomZones()
+    WG.CustomZones = {}
+    local rows = MySQL.query.await('SELECT * FROM wsmm_gang_custom_zones') or {}
+    for _, r in ipairs(rows) do
+        WG.CustomZones[#WG.CustomZones + 1] = {
+            id = r.id,
+            label = { ar = r.label, en = r.label },
+            coords = { x = r.x + 0.0, y = r.y + 0.0, z = (r.z or 30.0) + 0.0 },
+            size = (r.size or 90.0) + 0.0,
+            map = { x = r.map_x + 0.0, y = r.map_y + 0.0, w = r.map_w + 0.0, h = r.map_h + 0.0 },
+            custom = true
+        }
+    end
+end
+
+function WG.AllZones()
+    local out = {}
+    for i = 1, #Config.Zones do
+        out[#out + 1] = Config.Zones[i]
+    end
+    for i = 1, #(WG.CustomZones or {}) do
+        out[#out + 1] = WG.CustomZones[i]
+    end
+    return out
+end
+
+function WG.NewZoneId()
+    for _ = 1, 12 do
+        local id = ('cz_%x'):format(math.random(0x100000, 0xffffff))
+        local taken = WG.ZoneState[id]
+        if not taken then
+            for _, z in ipairs(WG.AllZones()) do
+                if z.id == id then taken = true break end
+            end
+        end
+        if not taken then return id end
+    end
+    return ('cz_%d'):format(os.time() % 99999999)
+end
+
+function WG.LoadZones()
+    WG.LoadCustomZones()
+    WG.ZoneState = {}
+    for _, z in ipairs(WG.AllZones()) do
+        WG.ZoneState[z.id] = { owner_gang_id = nil, scores = {}, open = 1 }
+    end
+    for _, r in ipairs(MySQL.query.await('SELECT * FROM wsmm_gang_zone_state') or {}) do
+        local scores = {}
+        if r.scores and r.scores ~= '' then
+            local ok, decoded = pcall(json.decode, r.scores)
+            if ok and type(decoded) == 'table' then scores = decoded end
+        end
+        local open = 1
+        if r.open == 0 or r.open == false then open = 0 end
+        if WG.ZoneState[r.zone_id] then
+            WG.ZoneState[r.zone_id] = { owner_gang_id = r.owner_gang_id, scores = scores, open = open }
+        end
+    end
+end
+
+function WG.SaveZone(zoneId)
+    local st = WG.ZoneState[zoneId]
+    if not st then return end
+    local open = (st.open == 0) and 0 or 1
+    MySQL.query.await(
+        'INSERT INTO wsmm_gang_zone_state (zone_id, owner_gang_id, scores, open) VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE owner_gang_id = VALUES(owner_gang_id), scores = VALUES(scores), open = VALUES(open)',
+        { zoneId, st.owner_gang_id, json.encode(st.scores or {}), open }
+    )
+end
+
+function WG.ZoneIsOpen(zoneId)
+    local st = zoneId and WG.ZoneState[zoneId]
+    return st and st.open ~= 0
+end
+
+function WG.AddInfluence(zoneId, gangId, amount)
+    local st = WG.ZoneState[zoneId]
+    if not st or st.open == 0 then return end
+    local key = tostring(gangId)
+    st.scores[key] = (st.scores[key] or 0) + amount
+    local bestId, best = nil, 0
+    for gid, sc in pairs(st.scores) do
+        if sc > best then
+            best = sc
+            bestId = tonumber(gid)
+        end
+    end
+    local prev = st.owner_gang_id
+    if best >= 8 then
+        st.owner_gang_id = bestId
+    end
+    WG.SaveZone(zoneId)
+    if prev ~= st.owner_gang_id then
+        WG.RefreshBlipsAll()
+    end
+end
+
+function WG.LogActivity(src, gangId, action, detail)
+    local xP = src and ESX.GetPlayerFromId(src) or nil
+    local name = 'console'
+    local ident = ''
+    if xP then
+        ident = xP.identifier or ''
+        name = xP.getName and xP.getName() or GetPlayerName(src)
+    elseif src then
+        name = GetPlayerName(src) or 'player'
+    end
+    MySQL.insert.await(
+        'INSERT INTO wsmm_gang_activity (gang_id, actor, actor_name, action, detail) VALUES (?, ?, ?, ?, ?)',
+        { gangId, ident, name, action or 'info', tostring(detail or ''):sub(1, 180) }
+    )
+    MySQL.update.await(
+        'DELETE FROM wsmm_gang_activity WHERE created_at < DATE_SUB(NOW(), INTERVAL 14 DAY)'
+    )
+end
+
+function WG.PushNotif(gangId, ntype, key, detail)
+    if not gangId then return end
+    MySQL.insert.await(
+        'INSERT INTO wsmm_gang_notifications (gang_id, type, title, message) VALUES (?, ?, ?, ?)',
+        { gangId, ntype or 'info', key or '', tostring(detail or ''):sub(1, 180) }
+    )
+    MySQL.update.await(
+        'DELETE FROM wsmm_gang_notifications WHERE created_at < DATE_SUB(NOW(), INTERVAL 7 DAY)'
+    )
+end
+
+function WG.NotifyLeaders(gangId, key)
+    for ident, m in pairs(WG.Members) do
+        if m.gang_id == gangId and WG.IsLeader(m) then
+            local t = WG.Online[ident]
+            if t then WG.Notify(t, key) end
+        end
+    end
+end
+
+function WG.OnlineSrc(identifier)
+    return WG.Online[identifier]
+end
+
+local function identFromSrc(src)
+    local xP = ESX.GetPlayerFromId(src)
+    return xP and xP.identifier or nil, xP
+end
+
+local function xPFromServerId(sid)
+    sid = tonumber(sid)
+    if not sid then return nil end
+    return ESX.GetPlayerFromId(sid)
+end
+
+function WG.Rankings()
+    local list = {}
+    for id, g in pairs(WG.Gangs) do
+        local zones = 0
+        for _, st in pairs(WG.ZoneState) do
+            if st.owner_gang_id == id then zones = zones + 1 end
+        end
+        list[#list + 1] = {
+            id = id,
+            label = g.label,
+            tag = g.tag,
+            color = g.color,
+            icon = g.icon,
+            iconImage = g.icon_image,
+            points = g.points or 0,
+            sprays = g.spray_count or 0,
+            zones = zones,
+            score = (g.points or 0) + (g.spray_count or 0) * 2 + zones * 8
+        }
+    end
+    table.sort(list, function(a, b) return a.score > b.score end)
+    return list
+end
+
+function WG.Places(lang)
+    local out = {}
+    local list = WG.AllZones()
+    for i = 1, #list do
+        local z = list[i]
+        local st = WG.ZoneState[z.id] or { open = 1 }
+        local open = st.open ~= 0
+        local owner = st.owner_gang_id and WG.Gangs[st.owner_gang_id]
+        local col = owner and WGColor(owner.color) or nil
+        out[#out + 1] = {
+            id = z.id,
+            label = WGLabel(z.label, lang),
+            owner = owner and owner.label or nil,
+            color = owner and owner.color or nil,
+            hex = col and col.hex or nil,
+            icon = owner and owner.icon or nil,
+            iconImage = owner and owner.icon_image or nil,
+            x = z.coords.x,
+            y = z.coords.y,
+            size = WGZoneHalf(z),
+            map = z.map,
+            open = open,
+            claimed = owner ~= nil,
+            custom = z.custom == true,
+            influence = st.scores or {}
+        }
+    end
+    return out
+end
+
+local function gangMembers(gangId, lang)
+    local counts = {}
+    local rows = MySQL.query.await(
+        'SELECT identifier, COUNT(*) AS n FROM wsmm_gang_sprays WHERE gang_id = ? GROUP BY identifier',
+        { gangId }
+    ) or {}
+    for _, r in ipairs(rows) do
+        counts[r.identifier] = tonumber(r.n) or 0
+    end
+    local list = {}
+    for ident, m in pairs(WG.Members) do
+        if m.gang_id == gangId then
+            list[#list + 1] = {
+                identifier = ident,
+                name = m.name,
+                rank = m.rank,
+                rankLabel = WGRankLabel(m.rank, lang),
+                guest = m.is_guest == 1,
+                online = WG.Online[ident] ~= nil,
+                sprays = counts[ident] or 0
+            }
+        end
+    end
+    table.sort(list, function(a, b)
+        if a.online ~= b.online then return a.online end
+        return (a.rank or 0) > (b.rank or 0)
+    end)
+    return list
+end
+
+local function publicBlips()
+    local turfs = {}
+    local list = WG.AllZones()
+    for i = 1, #list do
+        local z = list[i]
+        local st = WG.ZoneState[z.id] or {}
+        if st.open ~= 0 then
+            local owner = st.owner_gang_id and WG.Gangs[st.owner_gang_id]
+            if owner then
+                local col = WGColor(owner.color)
+                local ic = WGIcon(owner.icon)
+                local half = WGZoneHalf(z)
+                turfs[#turfs + 1] = {
+                    x = z.coords.x, y = z.coords.y, z = z.coords.z,
+                    size = half,
+                    label = owner.label .. ' · ' .. WGLabel(z.label, Config.Locale),
+                    blipColor = col.blip,
+                    sprite = ic.sprite,
+                    hex = col.hex
+                }
+            end
+        end
+    end
+    return turfs
+end
+
+function WG.PrivateBlips(src)
+    local member = WG.MemberOf(src)
+    local admin = WG.IsAdmin(src)
+    local hq, sprays, summon = nil, {}, nil
+    local gang = member and WG.Gangs[member.gang_id]
+    if gang and gang.hq_x then
+        local col = WGColor(gang.color)
+        local ic = WGIcon(gang.icon)
+        hq = {
+            x = gang.hq_x, y = gang.hq_y, z = gang.hq_z,
+            label = gang.label,
+            sprite = ic.sprite,
+            blipColor = col.blip
+        }
+    end
+    if admin then
+        for _, g in pairs(WG.Gangs) do
+            if g.hq_x then
+                local col = WGColor(g.color)
+                local ic = WGIcon(g.icon)
+                -- admin sees all HQs via extra list
+            end
+        end
+    end
+    return { hq = hq, sprays = sprays, gangColor = gang and WGColor(gang.color).blip, gangSprite = gang and WGIcon(gang.icon).sprite }
+end
+
+function WG.RefreshBlips(src)
+    TriggerClientEvent('wsmm_gangs:blips', src, {
+        publicTurfs = publicBlips(),
+        private = WG.PrivateBlips(src),
+        admin = WG.IsAdmin(src)
+    })
+    if WG.IsAdmin(src) or (select(1, WG.MemberOf(src)) and WG.IsLeader(select(1, WG.MemberOf(src)))) then
+        WG.SendSprayBlips(src)
+    end
+end
+
+function WG.RefreshBlipsAll()
+    for _, src in pairs(WG.Online) do
+        WG.RefreshBlips(src)
+    end
+end
+
+function WG.BuildTablet(src, lang)
+    lang = lang or Config.Locale
+    local admin = WG.IsAdmin(src)
+    local member, xP = WG.MemberOf(src)
+    if not member and not admin then
+        return { ok = false, reason = 'not_member' }
+    end
+    local gang = member and WG.Gangs[member.gang_id] or nil
+    local isLeader = WG.IsLeader(member)
+    local payload = {
+        ok = true,
+        lang = lang,
+        strings = Locales[lang] or Locales['ar'],
+        isAdmin = admin,
+        isLeader = isLeader,
+        isGuest = member and member.is_guest == 1 or false,
+        isMember = member and member.is_guest == 0 or false,
+        me = xP and { name = xP.getName and xP.getName() or GetPlayerName(src), rank = member and member.rank } or nil,
+        gang = nil,
+        places = WG.Places(lang),
+        rankings = WG.Rankings(),
+        members = {},
+        guests = {},
+        sprayLog = nil,
+        activityLog = nil,
+        notifs = {},
+        adminSprays = nil,
+        pendingIcons = nil,
+        gangs = nil,
+        colors = Config.Colors,
+        icons = Config.Icons,
+        ranks = Config.Ranks
+    }
+    if gang then
+        local col = WGColor(gang.color)
+        payload.gang = {
+            id = gang.id,
+            name = gang.name,
+            label = gang.label,
+            tag = gang.tag,
+            color = gang.color,
+            hex = col.hex,
+            icon = gang.icon,
+            iconImage = gang.icon_image,
+            pendingIcon = (isLeader or admin) and gang.pending_icon or nil,
+            pendingIconImage = (isLeader or admin) and gang.pending_icon_image or nil,
+            points = gang.points,
+            sprays = gang.spray_count
+        }
+        payload.members = gangMembers(gang.id, lang)
+        for _, m in ipairs(payload.members) do
+            if m.guest then payload.guests[#payload.guests + 1] = m end
+        end
+        payload.notifs = MySQL.query.await(
+            'SELECT id, type, title, message, created_at FROM wsmm_gang_notifications WHERE gang_id = ? ORDER BY id DESC LIMIT 30',
+            { gang.id }
+        ) or {}
+    end
+    if isLeader and gang then
+        payload.sprayLog = MySQL.query.await(
+            'SELECT id, player_name, mode, text_content, x, y, z, zone_id, created_at FROM wsmm_gang_sprays WHERE gang_id = ? ORDER BY id DESC LIMIT 40',
+            { gang.id }
+        ) or {}
+        payload.activityLog = MySQL.query.await(
+            'SELECT id, gang_id, actor_name, action, detail, created_at FROM wsmm_gang_activity WHERE gang_id = ? ORDER BY id DESC LIMIT 40',
+            { gang.id }
+        ) or {}
+    end
+    if admin then
+        payload.adminSprays = MySQL.query.await(
+            'SELECT s.id, s.player_name, s.mode, s.text_content, s.x, s.y, s.z, s.zone_id, s.created_at, s.gang_id, g.label AS gang_label FROM wsmm_gang_sprays s LEFT JOIN wsmm_gangs g ON g.id = s.gang_id ORDER BY s.id DESC LIMIT 80'
+        ) or {}
+        payload.pendingIcons = {}
+        payload.gangs = {}
+        for _, g in pairs(WG.Gangs) do
+            payload.gangs[#payload.gangs + 1] = {
+                id = g.id, name = g.name, label = g.label, tag = g.tag,
+                color = g.color, icon = g.icon, pendingIcon = g.pending_icon,
+                iconImage = g.icon_image, pendingIconImage = g.pending_icon_image,
+                points = g.points, leader = g.leader
+            }
+            if hasPendingIcon(g) then
+                payload.pendingIcons[#payload.pendingIcons + 1] = {
+                    id = g.id, label = g.label,
+                    current = g.icon, pending = g.pending_icon,
+                    currentImage = g.icon_image, pendingImage = g.pending_icon_image
+                }
+            end
+        end
+        payload.activityLog = MySQL.query.await(
+            'SELECT a.id, a.gang_id, a.actor_name, a.action, a.detail, a.created_at, g.label AS gang_label FROM wsmm_gang_activity a LEFT JOIN wsmm_gangs g ON g.id = a.gang_id ORDER BY a.id DESC LIMIT 80'
+        ) or {}
+    end
+    return WGScrubTablet(payload)
+end
+
+local function setOnline(src)
+    local xP = ESX.GetPlayerFromId(src)
+    if xP then WG.Online[xP.identifier] = src end
+end
+
+local function setOffline(src)
+    for ident, s in pairs(WG.Online) do
+        if s == src then WG.Online[ident] = nil end
+    end
+end
+
+AddEventHandler('esx:playerLoaded', function(playerId, xPlayer)
+    local src = tonumber(playerId)
+    if xPlayer and xPlayer.source then src = tonumber(xPlayer.source) or src end
+    if not WG.ValidSrc(src) then return end
+    Wait(400)
+    setOnline(src)
+    WG.RefreshBlips(src)
+end)
+
+AddEventHandler('playerDropped', function()
+    local src = source
+    setOffline(src)
+    WG.ClearGuard(src)
+end)
+
+RegisterNetEvent('wsmm_gangs:requestTablet', function(lang)
+    local src = source
+    if not WG.RateOk(src, 'tablet', WG.SecMs('tabletMs', 800)) then return end
+    lang = (lang == 'en' or lang == 'ar') and lang or Config.Locale
+    local data = WG.BuildTablet(src, lang)
+    TriggerClientEvent('wsmm_gangs:tabletData', src, data)
+end)
+
+RegisterNetEvent('wsmm_gangs:requestBlips', function()
+    local src = source
+    if not WG.RateOk(src, 'blips', WG.SecMs('blipsMs', 1500)) then return end
+    WG.RefreshBlips(src)
+end)
+
+RegisterNetEvent('wsmm_gangs:uploadIcon', function(data)
+    local src = source
+    if not WG.RateOk(src, 'icon', WG.SecMs('iconMs', 4000)) then return end
+    WG.SavePendingIcon(src, data or {})
+end)
+
+RegisterNetEvent('wsmm_gangs:action', function(action, data)
+    local src = source
+    if not WG.RateOk(src, 'action', WG.SecMs('actionMs', 180)) then return end
+    if not WG.KnownAction(action) then return end
+    if type(data) ~= 'table' then data = {} end
+    local member, xP = WG.MemberOf(src)
+    local admin = WG.IsAdmin(src)
+    local gang = member and WG.Gangs[member.gang_id] or nil
+
+    if action == 'summon' then
+        if not member or member.is_guest == 1 or not gang then return WG.Notify(src, 'not_member') end
+        if (member.rank or 0) < Config.MinSummonRank and not WG.IsLeader(member) then
+            return WG.Notify(src, 'summon_need_rank')
+        end
+        local now = os.time()
+        if summonCd[member.identifier] and now - summonCd[member.identifier] < Config.SummonCooldown then
+            return WG.Notify(src, 'cooldown')
+        end
+        summonCd[member.identifier] = now
+        local ped = GetPlayerPed(src)
+        local c = GetEntityCoords(ped)
+        local col = WGColor(gang.color)
+        local ic = WGIcon(gang.icon)
+        local payload = {
+            x = c.x, y = c.y, z = c.z,
+            caller = xP.getName and xP.getName() or GetPlayerName(src),
+            label = gang.label,
+            blipColor = col.blip,
+            sprite = ic.sprite,
+            minutes = Config.SummonBlipMinutes
+        }
+        local n = 0
+        for ident, m in pairs(WG.Members) do
+            if m.gang_id == gang.id then
+                local t = WG.Online[ident]
+                if t then
+                    TriggerClientEvent('wsmm_gangs:summon', t, payload)
+                    n = n + 1
+                end
+            end
+        end
+        WG.LogActivity(src, gang.id, 'summon', payload.caller)
+        WG.PushNotif(gang.id, 'summon', 'summon_banner', payload.caller)
+        WG.Notify(src, 'summon_sent')
+
+    elseif action == 'inviteGuest' then
+        if not WG.IsLeader(member) or not gang then return WG.Notify(src, 'not_leader') end
+        local count = 0
+        for _, m in pairs(WG.Members) do
+            if m.gang_id == gang.id and m.is_guest == 1 then count = count + 1 end
+        end
+        if count >= Config.MaxGuests then return WG.Notify(src, 'cooldown') end
+        local target = xPFromServerId(data.id)
+        if not target then return WG.Notify(src, 'not_member') end
+        if WG.Members[target.identifier] then return end
+        MySQL.insert.await(
+            'INSERT INTO wsmm_gang_members (gang_id, identifier, name, rank, is_guest, guest_until) VALUES (?, ?, ?, 1, 1, ?)',
+            { gang.id, target.identifier, target.getName and target.getName() or GetPlayerName(target.source), os.time() + Config.GuestMinutes * 60 }
+        )
+        local gname = target.getName and target.getName() or GetPlayerName(target.source)
+        WG.Reload()
+        WG.LogActivity(src, gang.id, 'guest_invite', gname)
+        WG.Notify(src, 'guest_invited')
+        WG.RefreshBlips(target.source)
+
+    elseif action == 'removeGuest' then
+        if not WG.IsLeader(member) or not gang then return WG.Notify(src, 'not_leader') end
+        local ident = WGIdent(data.identifier)
+        if not ident then return end
+        local gmember = WG.Members[ident]
+        if not gmember or gmember.gang_id ~= gang.id or gmember.is_guest ~= 1 then return end
+        MySQL.update.await('DELETE FROM wsmm_gang_members WHERE identifier = ? AND gang_id = ? AND is_guest = 1', { ident, gang.id })
+        WG.Reload()
+        WG.LogActivity(src, gang.id, 'guest_remove', gmember.name or ident)
+        WG.Notify(src, 'guest_removed')
+
+    elseif action == 'announce' then
+        if not WG.IsLeader(member) or not gang then return WG.Notify(src, 'not_leader') end
+        local msg = WGSafeText(data.text, 120)
+        if msg == '' or WGBanned(msg) then return WG.Notify(src, 'banned_text') end
+        WG.LogActivity(src, gang.id, 'announce', msg)
+        WG.PushNotif(gang.id, 'announce', 'announce', msg)
+
+    elseif action == 'setHQ' then
+        if not WG.IsLeader(member) or not gang then return WG.Notify(src, 'not_leader') end
+        local ped = GetPlayerPed(src)
+        if not ped or ped == 0 then return end
+        local c = GetEntityCoords(ped)
+        if not WGInWorld(c.x, c.y, c.z) then return end
+        MySQL.update.await('UPDATE wsmm_gangs SET hq_x = ?, hq_y = ?, hq_z = ? WHERE id = ?', { c.x, c.y, c.z, gang.id })
+        WG.Reload()
+        WG.Notify(src, 'hq_set')
+        WG.RefreshBlipsAll()
+
+    elseif action == 'setColor' then
+        if not WG.IsLeader(member) or not gang then return WG.Notify(src, 'not_leader') end
+        local col = WGColor(data.color)
+        MySQL.update.await('UPDATE wsmm_gangs SET color = ? WHERE id = ?', { col.id, gang.id })
+        WG.Reload()
+        WG.RefreshBlipsAll()
+
+    elseif action == 'requestIcon' then
+        local g = iconEditGang(member, admin, data)
+        if not g then return WG.Notify(src, admin and 'not_admin' or 'not_leader') end
+        local ic = WGIcon(data.icon)
+        MySQL.update.await('UPDATE wsmm_gangs SET pending_icon = ? WHERE id = ?', { ic.id, g.id })
+        WG.Reload()
+        WG.Notify(src, 'icon_pending')
+        WG.LogActivity(src, g.id, 'icon_request', ic.id)
+
+    elseif action == 'uploadIcon' then
+        WG.SavePendingIcon(src, data)
+
+    elseif action == 'setRank' then
+        if not WG.IsLeader(member) or not gang then return WG.Notify(src, 'not_leader') end
+        local ident = WGIdent(data.identifier)
+        if not ident or ident == member.identifier then return end
+        local target = WG.Members[ident]
+        if not target or target.gang_id ~= gang.id or target.is_guest == 1 then return end
+        if gang.leader and ident == gang.leader then return end
+        local rank = math.floor(tonumber(data.rank) or 1)
+        if rank < 1 then rank = 1 end
+        if rank > 4 then rank = 4 end
+        MySQL.update.await('UPDATE wsmm_gang_members SET rank = ? WHERE identifier = ? AND gang_id = ? AND is_guest = 0', { rank, ident, gang.id })
+        WG.Reload()
+        WG.LogActivity(src, gang.id, 'set_rank', (target.name or '') .. ' ' .. tostring(rank))
+
+    elseif action == 'kick' then
+        if not WG.IsLeader(member) or not gang then return WG.Notify(src, 'not_leader') end
+        local ident = WGIdent(data.identifier)
+        if not ident or ident == member.identifier then return end
+        local named = WG.Members[ident]
+        if not named or named.gang_id ~= gang.id then return end
+        if gang.leader and ident == gang.leader then return end
+        MySQL.update.await('DELETE FROM wsmm_gang_members WHERE identifier = ? AND gang_id = ?', { ident, gang.id })
+        WG.Reload()
+        WG.LogActivity(src, gang.id, 'kick', named.name or ident)
+        WG.Notify(src, 'member_removed')
+
+    elseif action == 'deleteSpray' then
+        local id = tonumber(data.id)
+        if not id then return end
+        local row = MySQL.single.await('SELECT * FROM wsmm_gang_sprays WHERE id = ?', { id })
+        if not row then return end
+        local ok = admin
+        if not ok and WG.IsLeader(member) and gang and row.gang_id == gang.id then ok = true end
+        if not ok then return WG.Notify(src, 'not_leader') end
+        WG.DeleteSpray(id, row.gang_id)
+        WG.Notify(src, 'spray_deleted')
+
+    elseif action == 'wipeGangSprays' then
+        local gid = tonumber(data.gangId)
+        if admin then
+            if not gid then return end
+        else
+            if not WG.IsLeader(member) then return WG.Notify(src, 'not_leader') end
+            gid = gang.id
+        end
+        WG.WipeGangSprays(gid)
+        WG.Notify(src, 'spray_deleted')
+
+    elseif action == 'adminCreate' then
+        if not admin then return WG.Notify(src, 'not_admin') end
+        local name = WGSafeText(data.name, 24):gsub('%s+', '')
+        local label = WGSafeText(data.label or name, 40)
+        local tag = WGSafeText(data.tag, 6)
+        if name == '' then return end
+        if name:find('[\'";\\/]') or label:find('[\'";\\]') then return end
+        if WGBanned(name) or WGBanned(label) or WGBanned(tag) then return WG.Notify(src, 'banned_text') end
+        local newId = MySQL.insert.await(
+            'INSERT INTO wsmm_gangs (name, label, tag, color, icon) VALUES (?, ?, ?, ?, ?)',
+            { name, label, tag, (WGColor(data.color).id), Config.DefaultIcon }
+        )
+        if not newId then return end
+        WG.Reload()
+        WG.LogActivity(src, newId, 'create_gang', label)
+        WG.Notify(src, 'gang_created')
+
+    elseif action == 'adminDelete' then
+        if not admin then return WG.Notify(src, 'not_admin') end
+        local gid = tonumber(data.gangId)
+        if not gid then return end
+        local gone = WG.Gangs[gid]
+        WG.LogActivity(src, gid, 'delete_gang', gone and gone.label or tostring(gid))
+        WG.WipeGangSprays(gid)
+        MySQL.update.await('DELETE FROM wsmm_gang_members WHERE gang_id = ?', { gid })
+        MySQL.update.await('DELETE FROM wsmm_gangs WHERE id = ?', { gid })
+        WG.Reload()
+        WG.Notify(src, 'gang_deleted')
+        WG.RefreshBlipsAll()
+
+    elseif action == 'adminSetLeader' then
+        if not admin then return WG.Notify(src, 'not_admin') end
+        local gid = tonumber(data.gangId)
+        local target = xPFromServerId(data.id)
+        if not gid or not target or not WG.Gangs[gid] then return end
+        MySQL.update.await('UPDATE wsmm_gang_members SET rank = 4 WHERE gang_id = ? AND rank = 5', { gid })
+        local existing = WG.Members[target.identifier]
+        if existing then
+            MySQL.update.await('UPDATE wsmm_gang_members SET gang_id = ?, rank = 5, is_guest = 0, name = ? WHERE identifier = ?', { gid, target.getName and target.getName() or '', target.identifier })
+        else
+            MySQL.insert.await(
+                'INSERT INTO wsmm_gang_members (gang_id, identifier, name, rank, is_guest) VALUES (?, ?, ?, 5, 0)',
+                { gid, target.identifier, target.getName and target.getName() or GetPlayerName(target.source) }
+            )
+        end
+        MySQL.update.await('UPDATE wsmm_gangs SET leader = ? WHERE id = ?', { target.identifier, gid })
+        WG.Reload()
+        WG.LogActivity(src, gid, 'set_leader', target.getName and target.getName() or GetPlayerName(target.source))
+        WG.Notify(src, 'leader_set')
+        WG.RefreshBlips(target.source)
+
+    elseif action == 'adminClearLeader' then
+        if not admin then return WG.Notify(src, 'not_admin') end
+        local gid = tonumber(data.gangId)
+        if not gid then return end
+        MySQL.update.await('UPDATE wsmm_gangs SET leader = NULL WHERE id = ?', { gid })
+        MySQL.update.await('UPDATE wsmm_gang_members SET rank = 4 WHERE gang_id = ? AND rank = 5', { gid })
+        WG.Reload()
+        WG.LogActivity(src, gid, 'clear_leader', '')
+        WG.Notify(src, 'leader_set')
+
+    elseif action == 'adminAddMember' then
+        if not admin then return WG.Notify(src, 'not_admin') end
+        local gid = tonumber(data.gangId)
+        local target = xPFromServerId(data.id)
+        if not gid or not target or not WG.Gangs[gid] then return end
+        if WG.Members[target.identifier] then
+            MySQL.update.await('UPDATE wsmm_gang_members SET gang_id = ?, is_guest = 0, rank = 1, name = ? WHERE identifier = ?', { gid, target.getName and target.getName() or '', target.identifier })
+        else
+            MySQL.insert.await(
+                'INSERT INTO wsmm_gang_members (gang_id, identifier, name, rank, is_guest) VALUES (?, ?, ?, 1, 0)',
+                { gid, target.identifier, target.getName and target.getName() or GetPlayerName(target.source) }
+            )
+        end
+        WG.Reload()
+        WG.LogActivity(src, gid, 'add_member', target.getName and target.getName() or GetPlayerName(target.source))
+        WG.Notify(src, 'member_added')
+        WG.RefreshBlips(target.source)
+
+    elseif action == 'adminRemoveMember' then
+        if not admin then return WG.Notify(src, 'not_admin') end
+        local ident = WGIdent(data.identifier)
+        if not ident then return end
+        local named = WG.Members[ident]
+        local gid = named and named.gang_id or nil
+        MySQL.update.await('DELETE FROM wsmm_gang_members WHERE identifier = ?', { ident })
+        WG.Reload()
+        WG.LogActivity(src, gid, 'remove_member', named and named.name or ident)
+        WG.Notify(src, 'member_removed')
+        WG.RefreshBlipsAll()
+
+    elseif action == 'adminPoints' then
+        if not admin then return WG.Notify(src, 'not_admin') end
+        local gid = tonumber(data.gangId)
+        if not gid or not WG.Gangs[gid] then return end
+        local cap = WG.SecMs('maxPoints', 9999999)
+        local pts = math.floor(tonumber(data.points) or 0)
+        if pts < 0 then pts = 0 end
+        if pts > cap then pts = cap end
+        MySQL.update.await('UPDATE wsmm_gangs SET points = ? WHERE id = ?', { pts, gid })
+        WG.Reload()
+
+    elseif action == 'approveIcon' then
+        if not admin then return WG.Notify(src, 'not_admin') end
+        local gid = tonumber(data.gangId)
+        local g = gid and WG.Gangs[gid]
+        if not g or not hasPendingIcon(g) then return end
+        local pendingImg = WGSanitizeIconDataUrl(g.pending_icon_image)
+        local iconId = (g.pending_icon and g.pending_icon ~= '') and g.pending_icon or (pendingImg and 'image' or g.icon)
+        MySQL.update.await([[
+            UPDATE wsmm_gangs SET
+                icon = COALESCE(NULLIF(pending_icon, ''), icon),
+                icon_image = CASE
+                    WHEN ? IS NOT NULL THEN ?
+                    ELSE icon_image
+                END,
+                pending_icon = NULL,
+                pending_icon_image = NULL
+            WHERE id = ?
+        ]], { pendingImg, pendingImg, gid })
+        WG.Reload()
+        WG.LogActivity(src, gid, 'icon_approve', iconId)
+        WG.PushNotif(gid, 'icon', 'icon_approved', iconId)
+        WG.NotifyLeaders(gid, 'icon_approved')
+        WG.RefreshBlipsAll()
+
+    elseif action == 'rejectIcon' then
+        if not admin then return WG.Notify(src, 'not_admin') end
+        local gid = tonumber(data.gangId)
+        local g = gid and WG.Gangs[gid]
+        if not g then return end
+        MySQL.update.await('UPDATE wsmm_gangs SET pending_icon = NULL, pending_icon_image = NULL WHERE id = ?', { gid })
+        WG.Reload()
+        WG.LogActivity(src, gid, 'icon_reject', g.icon or Config.DefaultIcon)
+        WG.PushNotif(gid, 'icon', 'icon_rejected', g.icon or Config.DefaultIcon)
+        WG.NotifyLeaders(gid, 'icon_rejected')
+
+    elseif action == 'wipeAllSprays' then
+        if not admin then return WG.Notify(src, 'not_admin') end
+        WG.WipeAllSprays()
+        WG.Notify(src, 'spray_deleted')
+
+    elseif action == 'setZoneOpen' then
+        if not admin then return WG.Notify(src, 'not_admin') end
+        local zoneId = WGSafeText(data.zoneId, 32)
+        if zoneId == '' or not WG.ZoneState[zoneId] then return end
+        local st = WG.ZoneState[zoneId]
+        local open = (tonumber(data.open) == 1 or data.open == true) and 1 or 0
+        st.open = open
+        WG.SaveZone(zoneId)
+        WG.LogActivity(src, nil, open == 1 and 'zone_open' or 'zone_lock', zoneId)
+        WG.Notify(src, open == 1 and 'zone_opened' or 'zone_locked')
+        WG.RefreshBlipsAll()
+
+    elseif action == 'createZone' then
+        if not admin then return WG.Notify(src, 'not_admin') end
+        local label = WGSafeText(data.label or data.name, 64)
+        if label == '' then
+            return WG.Notify(src, 'zone_need_name')
+        end
+        if WGBanned(label) then
+            return WG.Notify(src, 'banned_text')
+        end
+        if #(WG.CustomZones or {}) >= 40 then
+            return WG.Notify(src, 'zone_limit')
+        end
+        local world = WGMapBoxToWorld(data.map)
+        if not world then
+            return WG.Notify(src, 'zone_need_box')
+        end
+        local id = WG.NewZoneId()
+        MySQL.insert.await(
+            'INSERT INTO wsmm_gang_custom_zones (id, label, x, y, z, size, map_x, map_y, map_w, map_h) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            {
+                id, label, world.x, world.y, world.z, world.size,
+                world.map.x, world.map.y, world.map.w, world.map.h
+            }
+        )
+        WG.LoadCustomZones()
+        WG.ZoneState[id] = { owner_gang_id = nil, scores = {}, open = 1 }
+        WG.SaveZone(id)
+        WG.LogActivity(src, nil, 'zone_create', label)
+        WG.Notify(src, 'zone_created')
+        WG.RefreshBlipsAll()
+
+    elseif action == 'deleteZone' then
+        if not admin then return WG.Notify(src, 'not_admin') end
+        local zoneId = WGSafeText(data.zoneId, 32)
+        if zoneId == '' then return end
+        local custom = false
+        for _, z in ipairs(WG.CustomZones or {}) do
+            if z.id == zoneId then custom = true break end
+        end
+        if not custom then return end
+        MySQL.update.await('DELETE FROM wsmm_gang_custom_zones WHERE id = ?', { zoneId })
+        MySQL.update.await('DELETE FROM wsmm_gang_zone_state WHERE zone_id = ?', { zoneId })
+        WG.LoadZones()
+        WG.LogActivity(src, nil, 'zone_delete', zoneId)
+        WG.Notify(src, 'zone_deleted')
+        WG.RefreshBlipsAll()
+    end
+end)
+
+CreateThread(function()
+    waitESX()
+    WGEnsureSchema()
+    WGEnsureItems()
+    WG.Reload()
+    WG.LoadZones()
+
+    pcall(function()
+        ESX.RegisterUsableItem(Config.TabletItem, function(source)
+            TriggerClientEvent('wsmm_gangs:openTablet', source)
+        end)
+        ESX.RegisterUsableItem(Config.SprayItem, function(source)
+            TriggerClientEvent('wsmm_gangs:trySpray', source)
+        end)
+    end)
+    print('^2[WSMM GANGS]^7 جاهز. حط في server.cfg: ensure oxmysql / ensure es_extended / ensure wsmm-gangs')
+    print('^2[WSMM GANGS]^7 الأدمن: F10 أو /gangadmin — بعدين أنشئ عصابة وعيّن قائد.')
+
+    for _, xP in ipairs(players()) do
+        if xP and xP.source then
+            WG.Online[xP.identifier] = xP.source
+            WG.RefreshBlips(xP.source)
+        end
+    end
+end)
+
+CreateThread(function()
+    while true do
+        Wait(Config.PresenceSeconds * 1000)
+        if ESX then
+            for _, xP in ipairs(players()) do
+                local m = xP and WG.Members[xP.identifier]
+                if m and m.is_guest == 0 then
+                    local ped = GetPlayerPed(xP.source)
+                    if ped and ped ~= 0 then
+                        local c = GetEntityCoords(ped)
+                        local z = WGGetZoneAt(c)
+                        if z then
+                            WG.AddInfluence(z.id, m.gang_id, Config.PresencePoints)
+                        end
+                    end
+                end
+            end
+        end
+    end
+end)
