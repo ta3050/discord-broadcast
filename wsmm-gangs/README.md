@@ -26,6 +26,10 @@ Tables are created automatically on start.
 
 `ox_lib` is **not** required.
 
+## Security
+
+The tablet NUI is not trusted. Admin/leader checks, item checks, and cooldowns run on the **server**. Net events are rate-limited, spray coords must be near the player, identifiers and text are sanitized, SQL uses placeholders, and icon uploads are type/size checked. Delete stays a red button; turf colors stay per-gang.
+
 ## Keys
 
 | Key | Action |

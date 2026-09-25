@@ -26,6 +26,19 @@ Config.MaxGangSprays = 40
 
 Config.AdminGroups = { admin = true, superadmin = true, god = true }
 
+-- Server-side caps. NUI is not trusted; every event is rate-limited and re-checked.
+Config.Security = {
+    actionMs = 180,
+    tabletMs = 300,
+    spraysMs = 2500,
+    blipsMs = 1500,
+    iconMs = 4000,
+    canSprayMs = 800,
+    maxPoints = 9999999,
+    identMax = 80,
+    spraySlack = 3.0
+}
+
 Config.Spray = {
     cooldown = 8,
     range = 4.2,

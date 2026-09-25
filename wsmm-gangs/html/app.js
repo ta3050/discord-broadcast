@@ -747,7 +747,10 @@ $('search').addEventListener('input', () => {
 $('page').onclick = (e) => {
   const b = e.target.closest('button[data-act]');
   if (b) {
-    post('action', JSON.parse(b.getAttribute('data-act')));
+    let payload = null;
+    try { payload = JSON.parse(b.getAttribute('data-act') || ''); } catch (err) { payload = null; }
+    if (!payload || typeof payload !== 'object' || !payload.a) return;
+    post('action', payload);
     setTimeout(() => post('refresh'), 250);
     return;
   }

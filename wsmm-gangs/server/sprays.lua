@@ -70,7 +70,12 @@ end
 
 RegisterNetEvent('wsmm_gangs:requestSprays', function(x, y, z)
     local src = source
-    x, y, z = tonumber(x) or 0, tonumber(y) or 0, tonumber(z) or 0
+    if not WG.RateOk(src, 'sprays', WG.SecMs('spraysMs', 2500)) then return end
+    x, y, z = WGFinite(x) or 0, WGFinite(y) or 0, WGFinite(z) or 0
+    if not WGInWorld(x, y, z) then
+        TriggerClientEvent('wsmm_gangs:setSprays', src, {})
+        return
+    end
     local range = Config.Spray.syncRange
     local rows = MySQL.query.await(
         'SELECT id, gang_id, mode, text_content, strokes, x, y, z, heading FROM wsmm_gang_sprays WHERE (x - ?) * (x - ?) + (y - ?) * (y - ?) < ? ORDER BY id DESC LIMIT 24',
@@ -83,7 +88,7 @@ RegisterNetEvent('wsmm_gangs:requestSprays', function(x, y, z)
         local strokes = nil
         if r.strokes and r.strokes ~= '' then
             local ok, decoded = pcall(json.decode, r.strokes)
-            if ok then strokes = decoded end
+            if ok then strokes = WGCompactStrokes(decoded) or decoded end
         end
         out[#out + 1] = {
             id = r.id,
@@ -92,7 +97,8 @@ RegisterNetEvent('wsmm_gangs:requestSprays', function(x, y, z)
             strokes = strokes,
             x = r.x, y = r.y, z = r.z,
             heading = r.heading,
-            hex = col.hex
+            hex = col.hex,
+            gangId = r.gang_id
         }
     end
     TriggerClientEvent('wsmm_gangs:setSprays', src, out)
@@ -100,7 +106,7 @@ end)
 
 RegisterNetEvent('wsmm_gangs:saveSpray', function(payload)
     local src = source
-    payload = payload or {}
+    payload = type(payload) == 'table' and payload or {}
     local member, xP = WG.MemberOf(src)
     if not member then return WG.Notify(src, 'no_spray') end
     if member.is_guest == 1 then return WG.Notify(src, 'guest_no_spray') end
@@ -116,41 +122,33 @@ RegisterNetEvent('wsmm_gangs:saveSpray', function(payload)
     local mode = payload.mode == 'text' and 'text' or 'freehand'
     local text = nil
     local strokesJson = nil
+    local compact = nil
     if mode == 'text' then
-        text = tostring(payload.text or ''):sub(1, Config.Spray.maxText)
+        text = WGSafeText(payload.text, Config.Spray.maxText)
         if text == '' then return WG.Notify(src, 'empty_draw') end
         if WGBanned(text) then return WG.Notify(src, 'banned_text') end
     else
-        local strokes = payload.strokes
-        if type(strokes) ~= 'table' or #strokes < 1 then return WG.Notify(src, 'empty_draw') end
-        local compact = {}
-        for i = 1, math.min(#strokes, 8) do
-            local s = strokes[i]
-            if type(s) == 'table' then
-                local line = {}
-                local step = 1
-                if #s > 40 then step = math.ceil(#s / 40) end
-                for p = 1, #s, step do
-                    local pt = s[p]
-                    if type(pt) == 'table' then
-                        line[#line + 1] = {
-                            x = math.max(0, math.min(1, tonumber(pt.x) or 0)),
-                            y = math.max(0, math.min(1, tonumber(pt.y) or 0))
-                        }
-                    end
-                end
-                if #line >= 2 then compact[#compact + 1] = line end
-            end
-        end
-        if #compact < 1 then return WG.Notify(src, 'empty_draw') end
+        compact = WGCompactStrokes(payload.strokes)
+        if not compact then return WG.Notify(src, 'empty_draw') end
         strokesJson = json.encode(compact)
     end
 
-    local x = tonumber(payload.x)
-    local y = tonumber(payload.y)
-    local z = tonumber(payload.z)
-    local heading = tonumber(payload.heading) or 0
-    if not x then return WG.Notify(src, 'need_wall') end
+    local x = WGFinite(payload.x)
+    local y = WGFinite(payload.y)
+    local z = WGFinite(payload.z)
+    local heading = WGFinite(payload.heading) or 0
+    if not x or not y or not z or not WGInWorld(x, y, z) then return WG.Notify(src, 'need_wall') end
+    heading = heading % 360.0
+
+    local ped = GetPlayerPed(src)
+    if not ped or ped == 0 then return WG.Notify(src, 'need_wall') end
+    local c = GetEntityCoords(ped)
+    local slack = WG.SecMs('spraySlack', 3.0)
+    local maxDist = (Config.Spray.range or 4.2) + slack
+    local dx, dy, dz = c.x - x, c.y - y, c.z - z
+    if (dx * dx + dy * dy + dz * dz) > (maxDist * maxDist) then
+        return WG.Notify(src, 'need_wall')
+    end
 
     local zone = WGGetZoneAt({ x = x, y = y, z = z })
     local zoneId = zone and zone.id or nil
@@ -190,7 +188,7 @@ RegisterNetEvent('wsmm_gangs:saveSpray', function(payload)
         id = id,
         mode = mode,
         text = text,
-        strokes = payload.strokes,
+        strokes = compact,
         x = x, y = y, z = z,
         heading = heading,
         hex = col.hex,
@@ -202,6 +200,7 @@ end)
 
 RegisterNetEvent('wsmm_gangs:canSpray', function()
     local src = source
+    if not WG.RateOk(src, 'canSpray', WG.SecMs('canSprayMs', 800)) then return end
     local member = WG.MemberOf(src)
     if not member then return TriggerClientEvent('wsmm_gangs:sprayDenied', src, 'no_spray') end
     if member.is_guest == 1 then return TriggerClientEvent('wsmm_gangs:sprayDenied', src, 'guest_no_spray') end

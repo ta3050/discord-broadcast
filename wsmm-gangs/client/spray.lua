@@ -63,11 +63,17 @@ local function drawFreehand(s)
 end
 
 RegisterNetEvent('wsmm_gangs:setSprays', function(list)
-    nearby = list or {}
+    if type(list) ~= 'table' then return end
+    nearby = list
 end)
 
 RegisterNetEvent('wsmm_gangs:addSpray', function(s)
-    if not s then return end
+    if type(s) ~= 'table' then return end
+    if not WGFinite(s.x) or not WGFinite(s.y) or not WGFinite(s.z) then return end
+    if s.strokes and (type(s.strokes) ~= 'table' or #s.strokes > 8) then
+        s.strokes = WGCompactStrokes(s.strokes)
+    end
+    if s.text then s.text = WGSafeText(s.text, 28) end
     local coords = GetEntityCoords(PlayerPedId())
     if #(coords - vector3(s.x, s.y, s.z)) > Config.Spray.syncRange then return end
     nearby[#nearby + 1] = s
@@ -107,7 +113,7 @@ CreateThread(function()
         local coords = GetEntityCoords(PlayerPedId())
         for i = 1, #nearby do
             local s = nearby[i]
-            if #(coords - vector3(s.x, s.y, s.z)) < Config.Spray.drawRange then
+            if s and WGFinite(s.x) and WGFinite(s.y) and WGFinite(s.z) and #(coords - vector3(s.x, s.y, s.z)) < Config.Spray.drawRange then
                 wait = 0
                 if s.mode == 'text' and s.text then
                     drawText3d(s.x, s.y, s.z, s.text, s.hex)

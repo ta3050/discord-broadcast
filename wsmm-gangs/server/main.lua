@@ -532,41 +532,52 @@ local function setOffline(src)
     end
 end
 
-RegisterNetEvent('esx:playerLoaded', function(playerId, xPlayer)
-    local src = playerId or source
+AddEventHandler('esx:playerLoaded', function(playerId, xPlayer)
+    local src = tonumber(playerId)
+    if xPlayer and xPlayer.source then src = tonumber(xPlayer.source) or src end
+    if not WG.ValidSrc(src) then return end
     Wait(400)
     setOnline(src)
     WG.RefreshBlips(src)
 end)
 
 AddEventHandler('playerDropped', function()
-    setOffline(source)
+    local src = source
+    setOffline(src)
+    WG.ClearGuard(src)
 end)
 
 RegisterNetEvent('wsmm_gangs:requestTablet', function(lang)
     local src = source
+    if not WG.RateOk(src, 'tablet', WG.SecMs('tabletMs', 800)) then return end
     lang = (lang == 'en' or lang == 'ar') and lang or Config.Locale
     local data = WG.BuildTablet(src, lang)
     TriggerClientEvent('wsmm_gangs:tabletData', src, data)
 end)
 
 RegisterNetEvent('wsmm_gangs:requestBlips', function()
-    WG.RefreshBlips(source)
+    local src = source
+    if not WG.RateOk(src, 'blips', WG.SecMs('blipsMs', 1500)) then return end
+    WG.RefreshBlips(src)
 end)
 
 RegisterNetEvent('wsmm_gangs:uploadIcon', function(data)
-    WG.SavePendingIcon(source, data or {})
+    local src = source
+    if not WG.RateOk(src, 'icon', WG.SecMs('iconMs', 4000)) then return end
+    WG.SavePendingIcon(src, data or {})
 end)
 
 RegisterNetEvent('wsmm_gangs:action', function(action, data)
     local src = source
-    data = data or {}
+    if not WG.RateOk(src, 'action', WG.SecMs('actionMs', 180)) then return end
+    if not WG.KnownAction(action) then return end
+    if type(data) ~= 'table' then data = {} end
     local member, xP = WG.MemberOf(src)
     local admin = WG.IsAdmin(src)
     local gang = member and WG.Gangs[member.gang_id] or nil
 
     if action == 'summon' then
-        if not member or member.is_guest == 1 then return WG.Notify(src, 'not_member') end
+        if not member or member.is_guest == 1 or not gang then return WG.Notify(src, 'not_member') end
         if (member.rank or 0) < Config.MinSummonRank and not WG.IsLeader(member) then
             return WG.Notify(src, 'summon_need_rank')
         end
@@ -602,7 +613,7 @@ RegisterNetEvent('wsmm_gangs:action', function(action, data)
         WG.Notify(src, 'summon_sent')
 
     elseif action == 'inviteGuest' then
-        if not WG.IsLeader(member) then return WG.Notify(src, 'not_leader') end
+        if not WG.IsLeader(member) or not gang then return WG.Notify(src, 'not_leader') end
         local count = 0
         for _, m in pairs(WG.Members) do
             if m.gang_id == gang.id and m.is_guest == 1 then count = count + 1 end
@@ -622,30 +633,36 @@ RegisterNetEvent('wsmm_gangs:action', function(action, data)
         WG.RefreshBlips(target.source)
 
     elseif action == 'removeGuest' then
-        if not WG.IsLeader(member) then return WG.Notify(src, 'not_leader') end
-        local gmember = WG.Members[data.identifier]
-        MySQL.update.await('DELETE FROM wsmm_gang_members WHERE identifier = ? AND gang_id = ? AND is_guest = 1', { data.identifier, gang.id })
+        if not WG.IsLeader(member) or not gang then return WG.Notify(src, 'not_leader') end
+        local ident = WGIdent(data.identifier)
+        if not ident then return end
+        local gmember = WG.Members[ident]
+        if not gmember or gmember.gang_id ~= gang.id or gmember.is_guest ~= 1 then return end
+        MySQL.update.await('DELETE FROM wsmm_gang_members WHERE identifier = ? AND gang_id = ? AND is_guest = 1', { ident, gang.id })
         WG.Reload()
-        WG.LogActivity(src, gang.id, 'guest_remove', gmember and gmember.name or tostring(data.identifier or ''))
+        WG.LogActivity(src, gang.id, 'guest_remove', gmember.name or ident)
         WG.Notify(src, 'guest_removed')
 
     elseif action == 'announce' then
-        if not WG.IsLeader(member) then return WG.Notify(src, 'not_leader') end
-        local msg = tostring(data.text or ''):sub(1, 120)
+        if not WG.IsLeader(member) or not gang then return WG.Notify(src, 'not_leader') end
+        local msg = WGSafeText(data.text, 120)
         if msg == '' or WGBanned(msg) then return WG.Notify(src, 'banned_text') end
         WG.LogActivity(src, gang.id, 'announce', msg)
         WG.PushNotif(gang.id, 'announce', 'announce', msg)
 
     elseif action == 'setHQ' then
-        if not WG.IsLeader(member) then return WG.Notify(src, 'not_leader') end
-        local c = GetEntityCoords(GetPlayerPed(src))
+        if not WG.IsLeader(member) or not gang then return WG.Notify(src, 'not_leader') end
+        local ped = GetPlayerPed(src)
+        if not ped or ped == 0 then return end
+        local c = GetEntityCoords(ped)
+        if not WGInWorld(c.x, c.y, c.z) then return end
         MySQL.update.await('UPDATE wsmm_gangs SET hq_x = ?, hq_y = ?, hq_z = ? WHERE id = ?', { c.x, c.y, c.z, gang.id })
         WG.Reload()
         WG.Notify(src, 'hq_set')
         WG.RefreshBlipsAll()
 
     elseif action == 'setColor' then
-        if not WG.IsLeader(member) then return WG.Notify(src, 'not_leader') end
+        if not WG.IsLeader(member) or not gang then return WG.Notify(src, 'not_leader') end
         local col = WGColor(data.color)
         MySQL.update.await('UPDATE wsmm_gangs SET color = ? WHERE id = ?', { col.id, gang.id })
         WG.Reload()
@@ -664,22 +681,29 @@ RegisterNetEvent('wsmm_gangs:action', function(action, data)
         WG.SavePendingIcon(src, data)
 
     elseif action == 'setRank' then
-        if not WG.IsLeader(member) then return WG.Notify(src, 'not_leader') end
-        local rank = tonumber(data.rank) or 1
+        if not WG.IsLeader(member) or not gang then return WG.Notify(src, 'not_leader') end
+        local ident = WGIdent(data.identifier)
+        if not ident or ident == member.identifier then return end
+        local target = WG.Members[ident]
+        if not target or target.gang_id ~= gang.id or target.is_guest == 1 then return end
+        if gang.leader and ident == gang.leader then return end
+        local rank = math.floor(tonumber(data.rank) or 1)
         if rank < 1 then rank = 1 end
         if rank > 4 then rank = 4 end
-        MySQL.update.await('UPDATE wsmm_gang_members SET rank = ? WHERE identifier = ? AND gang_id = ? AND is_guest = 0', { rank, data.identifier, gang.id })
-        local named = WG.Members[data.identifier]
+        MySQL.update.await('UPDATE wsmm_gang_members SET rank = ? WHERE identifier = ? AND gang_id = ? AND is_guest = 0', { rank, ident, gang.id })
         WG.Reload()
-        WG.LogActivity(src, gang.id, 'set_rank', (named and named.name or '') .. ' ' .. tostring(rank))
+        WG.LogActivity(src, gang.id, 'set_rank', (target.name or '') .. ' ' .. tostring(rank))
 
     elseif action == 'kick' then
-        if not WG.IsLeader(member) then return WG.Notify(src, 'not_leader') end
-        if data.identifier == member.identifier then return end
-        local named = WG.Members[data.identifier]
-        MySQL.update.await('DELETE FROM wsmm_gang_members WHERE identifier = ? AND gang_id = ?', { data.identifier, gang.id })
+        if not WG.IsLeader(member) or not gang then return WG.Notify(src, 'not_leader') end
+        local ident = WGIdent(data.identifier)
+        if not ident or ident == member.identifier then return end
+        local named = WG.Members[ident]
+        if not named or named.gang_id ~= gang.id then return end
+        if gang.leader and ident == gang.leader then return end
+        MySQL.update.await('DELETE FROM wsmm_gang_members WHERE identifier = ? AND gang_id = ?', { ident, gang.id })
         WG.Reload()
-        WG.LogActivity(src, gang.id, 'kick', named and named.name or tostring(data.identifier or ''))
+        WG.LogActivity(src, gang.id, 'kick', named.name or ident)
         WG.Notify(src, 'member_removed')
 
     elseif action == 'deleteSpray' then
@@ -706,14 +730,17 @@ RegisterNetEvent('wsmm_gangs:action', function(action, data)
 
     elseif action == 'adminCreate' then
         if not admin then return WG.Notify(src, 'not_admin') end
-        local name = tostring(data.name or ''):gsub('%s+', ''):sub(1, 24)
-        local label = tostring(data.label or name):sub(1, 40)
-        local tag = tostring(data.tag or ''):sub(1, 6)
+        local name = WGSafeText(data.name, 24):gsub('%s+', '')
+        local label = WGSafeText(data.label or name, 40)
+        local tag = WGSafeText(data.tag, 6)
         if name == '' then return end
+        if name:find('[\'";\\/]') or label:find('[\'";\\]') then return end
+        if WGBanned(name) or WGBanned(label) or WGBanned(tag) then return WG.Notify(src, 'banned_text') end
         local newId = MySQL.insert.await(
             'INSERT INTO wsmm_gangs (name, label, tag, color, icon) VALUES (?, ?, ?, ?, ?)',
             { name, label, tag, (WGColor(data.color).id), Config.DefaultIcon }
         )
+        if not newId then return end
         WG.Reload()
         WG.LogActivity(src, newId, 'create_gang', label)
         WG.Notify(src, 'gang_created')
@@ -782,18 +809,24 @@ RegisterNetEvent('wsmm_gangs:action', function(action, data)
 
     elseif action == 'adminRemoveMember' then
         if not admin then return WG.Notify(src, 'not_admin') end
-        local named = WG.Members[data.identifier]
+        local ident = WGIdent(data.identifier)
+        if not ident then return end
+        local named = WG.Members[ident]
         local gid = named and named.gang_id or nil
-        MySQL.update.await('DELETE FROM wsmm_gang_members WHERE identifier = ?', { data.identifier })
+        MySQL.update.await('DELETE FROM wsmm_gang_members WHERE identifier = ?', { ident })
         WG.Reload()
-        WG.LogActivity(src, gid, 'remove_member', named and named.name or tostring(data.identifier or ''))
+        WG.LogActivity(src, gid, 'remove_member', named and named.name or ident)
         WG.Notify(src, 'member_removed')
         WG.RefreshBlipsAll()
 
     elseif action == 'adminPoints' then
         if not admin then return WG.Notify(src, 'not_admin') end
         local gid = tonumber(data.gangId)
-        local pts = tonumber(data.points) or 0
+        if not gid or not WG.Gangs[gid] then return end
+        local cap = WG.SecMs('maxPoints', 9999999)
+        local pts = math.floor(tonumber(data.points) or 0)
+        if pts < 0 then pts = 0 end
+        if pts > cap then pts = cap end
         MySQL.update.await('UPDATE wsmm_gangs SET points = ? WHERE id = ?', { pts, gid })
         WG.Reload()
 
@@ -838,9 +871,9 @@ RegisterNetEvent('wsmm_gangs:action', function(action, data)
 
     elseif action == 'setZoneOpen' then
         if not admin then return WG.Notify(src, 'not_admin') end
-        local zoneId = tostring(data.zoneId or '')
+        local zoneId = WGSafeText(data.zoneId, 32)
+        if zoneId == '' or not WG.ZoneState[zoneId] then return end
         local st = WG.ZoneState[zoneId]
-        if not st then return end
         local open = (tonumber(data.open) == 1 or data.open == true) and 1 or 0
         st.open = open
         WG.SaveZone(zoneId)
@@ -850,8 +883,8 @@ RegisterNetEvent('wsmm_gangs:action', function(action, data)
 
     elseif action == 'createZone' then
         if not admin then return WG.Notify(src, 'not_admin') end
-        local label = tostring(data.label or data.name or ''):gsub('^%s+', ''):gsub('%s+$', '')
-        if label == '' or #label > 64 then
+        local label = WGSafeText(data.label or data.name, 64)
+        if label == '' then
             return WG.Notify(src, 'zone_need_name')
         end
         if WGBanned(label) then
@@ -881,7 +914,8 @@ RegisterNetEvent('wsmm_gangs:action', function(action, data)
 
     elseif action == 'deleteZone' then
         if not admin then return WG.Notify(src, 'not_admin') end
-        local zoneId = tostring(data.zoneId or '')
+        local zoneId = WGSafeText(data.zoneId, 32)
+        if zoneId == '' then return end
         local custom = false
         for _, z in ipairs(WG.CustomZones or {}) do
             if z.id == zoneId then custom = true break end

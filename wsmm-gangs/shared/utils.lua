@@ -93,6 +93,68 @@ function WGRankLabel(rank, lang)
     return row and WGLabel(row, lang) or tostring(rank)
 end
 
+function WGFinite(n)
+    n = tonumber(n)
+    if not n or n ~= n or n == math.huge or n == -math.huge then return nil end
+    return n
+end
+
+function WGIdent(s)
+    if type(s) ~= 'string' then return nil end
+    local maxLen = (Config.Security and Config.Security.identMax) or 80
+    s = s:sub(1, maxLen)
+    if #s < 3 or #s > maxLen then return nil end
+    if not s:match('^[%w:._%-]+$') then return nil end
+    return s
+end
+
+function WGSafeText(s, maxLen)
+    s = tostring(s or '')
+    s = s:gsub('[\r\n\t]', ' '):gsub('%c', '')
+    s = s:gsub('[~^<>]', '')
+    s = s:gsub('^%s+', ''):gsub('%s+$', '')
+    maxLen = maxLen or 80
+    if #s > maxLen then s = s:sub(1, maxLen) end
+    return s
+end
+
+function WGInWorld(x, y, z)
+    x, y, z = WGFinite(x), WGFinite(y), WGFinite(z)
+    if not x or not y or not z then return false end
+    if x < -8000.0 or x > 8000.0 then return false end
+    if y < -8000.0 or y > 8000.0 then return false end
+    if z < -200.0 or z > 2500.0 then return false end
+    return true
+end
+
+function WGCompactStrokes(strokes)
+    if type(strokes) ~= 'table' or #strokes < 1 then return nil end
+    local compact = {}
+    for i = 1, math.min(#strokes, 8) do
+        local s = strokes[i]
+        if type(s) == 'table' then
+            local line = {}
+            local step = 1
+            if #s > 40 then step = math.ceil(#s / 40) end
+            for p = 1, #s, step do
+                local pt = s[p]
+                if type(pt) == 'table' then
+                    local px, py = WGFinite(pt.x), WGFinite(pt.y)
+                    if px and py then
+                        line[#line + 1] = {
+                            x = math.max(0, math.min(1, px)),
+                            y = math.max(0, math.min(1, py))
+                        }
+                    end
+                end
+            end
+            if #line >= 2 then compact[#compact + 1] = line end
+        end
+    end
+    if #compact < 1 then return nil end
+    return compact
+end
+
 function WGHexToRgb(hex)
     hex = (hex or '#3b7ac4'):gsub('#', '')
     return tonumber(hex:sub(1, 2), 16) or 231, tonumber(hex:sub(3, 4), 16) or 76, tonumber(hex:sub(5, 6), 16) or 60
