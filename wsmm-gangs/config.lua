@@ -84,7 +84,7 @@ Config.Icons = {
 
 Config.DefaultIcon = 'gang'
 
--- Custom PNG/JPG/WEBP for the tablet map only. GTA pause-map blips cannot
+-- Custom still PNG/JPG for the tablet map only (no video/webp/svg). GTA pause-map blips cannot
 -- take a custom PNG without a streamed texture dictionary, so in-game markers
 -- keep the sprite from Config.Icons (default `gang` until a list icon is approved).
 Config.IconUpload = {
@@ -94,8 +94,7 @@ Config.IconUpload = {
     mime = {
         ['image/png'] = true,
         ['image/jpeg'] = true,
-        ['image/jpg'] = true,
-        ['image/webp'] = true
+        ['image/jpg'] = true
     }
 }
 

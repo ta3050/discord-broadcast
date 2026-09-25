@@ -44,7 +44,7 @@ RegisterNetEvent('wsmm_gangs:tabletData', function(data)
     end
     tabletOpen = true
     SetNuiFocus(true, true)
-    nui('openTablet', data)
+    nui('openTablet', WGScrubTablet(data))
 end)
 
 RegisterNetEvent('wsmm_gangs:openTablet', function()
@@ -109,11 +109,11 @@ RegisterNetEvent('wsmm_gangs:summon', function(p)
     EndTextCommandSetBlipName(blip)
     pendingSummon.blip = blip
     nui('summon', {
-        caller = p.caller,
-        label = p.label,
+        caller = WGSafeText(p.caller, 40),
+        label = WGSafeText(p.label, 40),
         strings = Locales[lang] or Locales['ar']
     })
-    WGToast(_L('summon_banner', lang) .. ': ' .. (p.caller or ''))
+    WGToast(_L('summon_banner', lang) .. ': ' .. WGSafeText(p.caller, 40))
     SetTimeout((p.minutes or 8) * 60 * 1000, function()
         if pendingSummon and pendingSummon.blip == blip and DoesBlipExist(blip) then
             RemoveBlip(blip)

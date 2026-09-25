@@ -74,7 +74,7 @@ Tablet map uses the real **Los Santos** image (`html/los-santos-map.png`). Terri
 
 In-game pause map uses `AddBlipForArea` squares for claimed open turf. GTA cannot paint a custom PNG onto pause-map blips without a streamed texture dictionary, so those stay default sprites. Uploaded gang images show on the **tablet map** after admin approval.
 
-Map icon: leader uploads PNG/JPG/WEBP (max 512 KB) or picks a list icon → **admin approve/reject**. Until approved, the old icon stays. Spray has **no** image upload (draw/text only).
+Map icon: leader uploads a still PNG/JPG (max 512 KB) or picks a list icon → **admin approve/reject**. Video, SVG, WebP, and animated PNG are rejected. Until approved, the old icon stays. Spray has **no** image upload (draw/text only).
 
 ## Ranks
 

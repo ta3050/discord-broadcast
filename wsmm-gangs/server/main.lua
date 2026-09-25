@@ -107,6 +107,16 @@ end
 function WG.Reload()
     WG.Gangs = {}
     for _, r in ipairs(MySQL.query.await('SELECT * FROM wsmm_gangs') or {}) do
+        local img = WGSanitizeIconDataUrl(r.icon_image)
+        local pend = WGSanitizeIconDataUrl(r.pending_icon_image)
+        if (r.icon_image or '') ~= '' and not img then
+            MySQL.update.await('UPDATE wsmm_gangs SET icon_image = NULL WHERE id = ?', { r.id })
+        end
+        if (r.pending_icon_image or '') ~= '' and not pend then
+            MySQL.update.await('UPDATE wsmm_gangs SET pending_icon_image = NULL WHERE id = ?', { r.id })
+        end
+        r.icon_image = img
+        r.pending_icon_image = pend
         WG.Gangs[r.id] = r
     end
     WG.Members = {}
@@ -518,7 +528,7 @@ function WG.BuildTablet(src, lang)
             'SELECT a.id, a.gang_id, a.actor_name, a.action, a.detail, a.created_at, g.label AS gang_label FROM wsmm_gang_activity a LEFT JOIN wsmm_gangs g ON g.id = a.gang_id ORDER BY a.id DESC LIMIT 80'
         ) or {}
     end
-    return payload
+    return WGScrubTablet(payload)
 end
 
 local function setOnline(src)
@@ -835,18 +845,19 @@ RegisterNetEvent('wsmm_gangs:action', function(action, data)
         local gid = tonumber(data.gangId)
         local g = gid and WG.Gangs[gid]
         if not g or not hasPendingIcon(g) then return end
-        local iconId = (g.pending_icon and g.pending_icon ~= '') and g.pending_icon or (g.pending_icon_image and 'image' or g.icon)
+        local pendingImg = WGSanitizeIconDataUrl(g.pending_icon_image)
+        local iconId = (g.pending_icon and g.pending_icon ~= '') and g.pending_icon or (pendingImg and 'image' or g.icon)
         MySQL.update.await([[
             UPDATE wsmm_gangs SET
                 icon = COALESCE(NULLIF(pending_icon, ''), icon),
                 icon_image = CASE
-                    WHEN pending_icon_image IS NOT NULL AND pending_icon_image != '' THEN pending_icon_image
+                    WHEN ? IS NOT NULL THEN ?
                     ELSE icon_image
                 END,
                 pending_icon = NULL,
                 pending_icon_image = NULL
             WHERE id = ?
-        ]], { gid })
+        ]], { pendingImg, pendingImg, gid })
         WG.Reload()
         WG.LogActivity(src, gid, 'icon_approve', iconId)
         WG.PushNotif(gid, 'icon', 'icon_approved', iconId)

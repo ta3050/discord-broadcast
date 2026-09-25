@@ -151,7 +151,7 @@ RegisterNetEvent('wsmm_gangs:sprayAllowed', function(info)
     SendNUIMessage({
         action = 'openSpray',
         data = {
-            hex = info.hex,
+            hex = WGSafeHex(info.hex),
             maxText = info.maxText,
             strings = Locales[Config.Locale] or Locales['ar']
         }

@@ -11,6 +11,10 @@ function t(k) {
   return (S.strings && S.strings[k]) || k;
 }
 
+function et(k) {
+  return esc(t(k));
+}
+
 function $(id) { return document.getElementById(id); }
 
 let zoneDraw = { active: false, box: null, name: '' };
@@ -96,7 +100,7 @@ const NAV_ICONS = {
 
 function renderNav() {
   $('nav').innerHTML = navItems().map(([id, key]) =>
-    `<button class="nav ${page === id ? 'active' : ''}" data-page="${id}"><span class="nav-ic">${NAV_ICONS[id] || ''}</span>${t(key)}</button>`
+    `<button class="nav ${page === id ? 'active' : ''}" data-page="${id}"><span class="nav-ic">${NAV_ICONS[id] || ''}</span>${et(key)}</button>`
   ).join('');
   syncRail();
 }
@@ -175,16 +179,68 @@ function bindSideRail() {
 
 function esc(s) {
   return String(s == null ? '' : s)
-    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+    .replace(/`/g, '&#96;');
+}
+
+function safeHex(hex) {
+  const s = String(hex || '');
+  return /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(s) ? s : '#3b7ac4';
+}
+
+function num(v, fallback) {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : (fallback == null ? 0 : fallback);
 }
 
 function safeImg(src) {
-  return (src && /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/]+=*$/.test(src)) ? src : '';
+  if (typeof src !== 'string' || src.length < 32 || src.length > 700000) return '';
+  const comma = src.indexOf(',');
+  if (comma < 12) return '';
+  const head = src.slice(0, comma).toLowerCase();
+  if (head !== 'data:image/png;base64' && head !== 'data:image/jpeg;base64') return '';
+  const b64 = src.slice(comma + 1);
+  if (!/^[A-Za-z0-9+/]+=*$/.test(b64)) return '';
+  if (head.indexOf('png') !== -1) {
+    if (b64.indexOf('iVBOR') !== 0) return '';
+  } else if (b64.indexOf('/9j/') !== 0) {
+    return '';
+  }
+  return 'data:image/' + (head.indexOf('png') !== -1 ? 'png' : 'jpeg') + ';base64,' + b64;
+}
+
+const IMG_KEYS = {
+  iconImage: 1, pendingIconImage: 1, currentImage: 1, pendingImage: 1,
+  icon_image: 1, pending_icon_image: 1
+};
+
+function scrubTablet(data) {
+  if (!data || typeof data !== 'object') return {};
+  const walk = (v, depth) => {
+    if (!v || typeof v !== 'object' || depth > 6) return;
+    if (Array.isArray(v)) {
+      for (let i = 0; i < v.length; i++) walk(v[i], depth + 1);
+      return;
+    }
+    const keys = Object.keys(v);
+    for (let i = 0; i < keys.length; i++) {
+      const k = keys[i];
+      if (IMG_KEYS[k]) v[k] = safeImg(v[k]) || null;
+      else if (k === 'hex') v[k] = safeHex(v[k]);
+      else if (v[k] && typeof v[k] === 'object') walk(v[k], depth + 1);
+    }
+  };
+  walk(data, 0);
+  return data;
 }
 
 function colorHex(id) {
   const c = (S.colors || []).find((x) => x.id === id);
-  return c ? c.hex : '#3b7ac4';
+  return safeHex(c ? c.hex : '#3b7ac4');
 }
 
 function iconLabel(id) {
@@ -204,28 +260,28 @@ function pageTitle() {
 
 function home() {
   const g = S.gang;
-  if (!g) return `<div class="card">${t('not_member')}</div>`;
+  if (!g) return `<div class="card">${et('not_member')}</div>`;
   const rank = (S.rankings || []).findIndex((x) => x.id === g.id);
   const live = safeImg(g.iconImage);
   const pend = (S.isLeader || S.isAdmin) ? safeImg(g.pendingIconImage) : '';
   return `<div class="cards">
-      <div class="card">${t('points')}<b class="big">${g.points || 0}</b></div>
-      <div class="card">${t('sprays')}<b class="big">${g.sprays || 0}</b></div>
-      <div class="card">${t('place')}<b class="big">#${rank >= 0 ? rank + 1 : '—'}</b></div>
+      <div class="card">${et('points')}<b class="big">${num(g.points)}</b></div>
+      <div class="card">${et('sprays')}<b class="big">${num(g.sprays)}</b></div>
+      <div class="card">${et('place')}<b class="big">#${rank >= 0 ? rank + 1 : '—'}</b></div>
     </div>
     <div class="card">${esc(g.label)} <span class="tag">[${esc(g.tag || '')}]</span>
-      <div class="xp">${t('color')}: ${esc(g.color || '')}
-        ${(S.isLeader || S.isAdmin) && (g.pendingIcon || pend) ? ' · ' + t('pending') + (g.pendingIcon ? ': ' + esc(iconLabel(g.pendingIcon)) : '') : ''}
+      <div class="xp">${et('color')}: ${esc(g.color || '')}
+        ${(S.isLeader || S.isAdmin) && (g.pendingIcon || pend) ? ' · ' + et('pending') + (g.pendingIcon ? ': ' + esc(iconLabel(g.pendingIcon)) : '') : ''}
       </div>
       <div class="row" style="margin-top:10px">
         ${live ? `<img class="icon-prev" alt="" src="${live}"/>` : ''}
-        ${pend ? `<div><div class="lbl">${t('pending')}</div><img class="icon-prev" alt="" src="${pend}"/></div>` : ''}
+        ${pend ? `<div><div class="lbl">${et('pending')}</div><img class="icon-prev" alt="" src="${pend}"/></div>` : ''}
       </div>
     </div>`;
 }
 
 function hexRgba(hex, a) {
-  const h = String(hex || '#8d9199').replace('#', '');
+  const h = safeHex(hex).replace('#', '');
   const n = parseInt(h.length === 3 ? h.split('').map((c) => c + c).join('') : h, 16);
   if (Number.isNaN(n)) return `rgba(141,145,153,${a})`;
   return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`;
@@ -233,7 +289,12 @@ function hexRgba(hex, a) {
 
 function mapBox(z) {
   if (z.map && z.map.w) {
-    return { left: z.map.x, top: z.map.y, w: z.map.w, h: z.map.h || z.map.w };
+    const left = num(z.map.x);
+    const top = num(z.map.y);
+    const w = num(z.map.w, 5);
+    const h = num(z.map.h || z.map.w, w);
+    if (!Number.isFinite(left) || !Number.isFinite(top) || w <= 0 || h <= 0) return null;
+    return { left, top, w, h };
   }
   const x = Number(z.x), y = Number(z.y);
   const left = 12 + ((x + 1850) / 2950) * 60;
@@ -252,7 +313,7 @@ function mapView() {
     const p = mapBox(z);
     if (!p) return '';
     const claimedZone = !!(z.claimed && z.owner);
-    const c = z.hex || colorHex(z.color);
+    const c = safeHex(z.hex || colorHex(z.color));
     const img = claimedZone ? safeImg(z.iconImage) : '';
     const cls = claimedZone ? 'turf claimed' : 'turf open';
     const style = claimedZone
@@ -267,35 +328,35 @@ function mapView() {
     ? `<div class="turf draft" style="left:${zoneDraw.box.x}%;top:${zoneDraw.box.y}%;width:${zoneDraw.box.w}%;height:${zoneDraw.box.h}%"></div>`
     : '';
   return `<div class="gta-map${S.isAdmin && zoneDraw.active ? ' drawing' : ''}">${boxes}${draft}
-      ${claimed.length ? `<div class="legend"><b>${t('map_legend')}</b>
-        ${claimed.map((z) => `<div><i style="background:${z.hex || colorHex(z.color)}"></i> ${esc(z.label)} — ${esc(z.owner)}</div>`).join('')}
+      ${claimed.length ? `<div class="legend"><b>${et('map_legend')}</b>
+        ${claimed.map((z) => `<div><i style="background:${safeHex(z.hex || colorHex(z.color))}"></i> ${esc(z.label)} — ${esc(z.owner)}</div>`).join('')}
       </div>` : ''}
     </div>
-    <p class="hint">${zoneDraw.active ? t('zone_draw_hint') : t('map_hint')}</p>
+    <p class="hint">${zoneDraw.active ? et('zone_draw_hint') : et('map_hint')}</p>
     ${S.isAdmin ? zoneAdmin() : ''}`;
 }
 
 function zoneAdmin() {
   if (!S.isAdmin) return '';
   const zones = S.places || [];
-  return `<div class="card"><b>${t('zones_admin')}</b>
-    <p class="hint">${t('map_open_hint')}</p>
+  return `<div class="card"><b>${et('zones_admin')}</b>
+    <p class="hint">${et('map_open_hint')}</p>
     <div class="row">
-      <button class="btn" id="zone-create" type="button">${t('create_zone')}</button>
+      <button class="btn" id="zone-create" type="button">${et('create_zone')}</button>
     </div>
-    ${zoneDraw.active ? `<input class="inp" id="zone-name" maxlength="32" placeholder="${t('zone_name')}" value="${esc(zoneDraw.name)}"/>
-      <p class="hint">${t('zone_draw_hint')}</p>
+    ${zoneDraw.active ? `<input class="inp" id="zone-name" maxlength="32" placeholder="${et('zone_name')}" value="${esc(zoneDraw.name)}"/>
+      <p class="hint">${et('zone_draw_hint')}</p>
       <div class="row">
-        <button class="btn" id="zone-save" type="button">${t('zone_save')}</button>
-        <button class="btn2" id="zone-cancel-draw" type="button">${t('zone_cancel')}</button>
+        <button class="btn" id="zone-save" type="button">${et('zone_save')}</button>
+        <button class="btn2" id="zone-cancel-draw" type="button">${et('zone_cancel')}</button>
       </div>` : ''}
     ${zones.map((z) => `<div class="log">
       <b>${esc(z.label)}</b>
-      <span class="xp">${z.open === false ? t('zone_locked_state') : t('zone_open_state')}${z.owner ? ' · ' + esc(z.owner) : ''}${z.custom ? ' · ' + t('zone_custom') : ''}</span>
+      <span class="xp">${z.open === false ? et('zone_locked_state') : et('zone_open_state')}${z.owner ? ' · ' + esc(z.owner) : ''}${z.custom ? ' · ' + et('zone_custom') : ''}</span>
       ${z.open === false
-        ? `<button class="btn ok" data-act='{"a":"setZoneOpen","zoneId":"${esc(z.id)}","open":1}'>${t('zone_open')}</button>`
-        : `<button class="btn2" data-act='{"a":"setZoneOpen","zoneId":"${esc(z.id)}","open":0}'>${t('zone_lock')}</button>`}
-      ${z.custom ? `<button class="btn no" data-act='{"a":"deleteZone","zoneId":"${esc(z.id)}"}'>${t('delete_zone')}</button>` : ''}
+        ? `<button class="btn ok" data-act='{"a":"setZoneOpen","zoneId":"${esc(z.id)}","open":1}'>${et('zone_open')}</button>`
+        : `<button class="btn2" data-act='{"a":"setZoneOpen","zoneId":"${esc(z.id)}","open":0}'>${et('zone_lock')}</button>`}
+      ${z.custom ? `<button class="btn no" data-act='{"a":"deleteZone","zoneId":"${esc(z.id)}"}'>${et('delete_zone')}</button>` : ''}
     </div>`).join('')}
   </div>`;
 }
@@ -388,7 +449,7 @@ function places() { return mapView(); }
 
 function rankings() {
   const list = S.rankings || [];
-  if (!list.length) return `<div class="card">${t('none')}</div>`;
+  if (!list.length) return `<div class="card">${et('none')}</div>`;
   const a = list[0], b = list[1], c = list[2];
   const rest = list.slice(3);
   const spot = (g, cls, place, medal) => {
@@ -398,8 +459,8 @@ function rankings() {
       <div class="avatar">${img ? `<img alt="" src="${img}"/>` : medal}</div>
       <div class="name">${esc(g.label)}</div>
       <div class="tag">[${esc(g.tag || '')}]</div>
-      <div class="xp">${t('points')} ${g.score || g.points || 0} · ${g.sprays || 0} ${t('sprays')}</div>
-      <div class="plinth">${place}</div>
+      <div class="xp">${et('points')} ${num(g.score || g.points)} · ${num(g.sprays)} ${et('sprays')}</div>
+      <div class="plinth">${esc(place)}</div>
     </div>`;
   };
   return `${list.length ? `<div class="podium">
@@ -411,60 +472,60 @@ function rankings() {
       <div class="rank-row">
         <span class="rank-num">${i + 4}</span>
         <div><b>${esc(g.label)}</b> <span class="tag">[${esc(g.tag || '')}]</span></div>
-        <span class="xp">${t('points')} ${g.score || g.points || 0} · ${g.sprays || 0} ${t('sprays')}</span>
+        <span class="xp">${et('points')} ${num(g.score || g.points)} · ${num(g.sprays)} ${et('sprays')}</span>
       </div>`).join('')}</div>`;
 }
 
 function membersView() {
   const q = (($('search') && $('search').value) || '').trim();
   const rows = (S.members || []).filter((m) => !q || String(m.name).includes(q));
-  if (!rows.length) return `<div class="card">${t('none')}</div>`;
+  if (!rows.length) return `<div class="card">${et('none')}</div>`;
   const canManage = S.isLeader || S.isAdmin;
   return `<table>
     <thead><tr>
       ${canManage ? '<th></th>' : ''}
-      <th>${t('col_status')}</th>
-      <th>${t('col_name')}</th>
-      <th>${t('col_role')}</th>
-      <th>${t('col_sprays')}</th>
+      <th>${et('col_status')}</th>
+      <th>${et('col_name')}</th>
+      <th>${et('col_role')}</th>
+      <th>${et('col_sprays')}</th>
     </tr></thead>
     <tbody>${rows.map((m) => `<tr>
-      ${canManage ? `<td><button class="manage" data-act='{"a":"kick","identifier":"${esc(m.identifier)}"}'>${t('manage')}</button></td>` : ''}
-      <td class="${m.online ? 'on' : 'off'}">${m.online ? '● ' + t('connected') : '○ ' + t('offline')}</td>
+      ${canManage ? `<td><button class="manage" data-act='{"a":"kick","identifier":"${esc(m.identifier)}"}'>${et('manage')}</button></td>` : ''}
+      <td class="${m.online ? 'on' : 'off'}">${m.online ? '● ' + et('connected') : '○ ' + et('offline')}</td>
       <td><b>${esc(m.name)}</b></td>
-      <td><span class="pill">${esc(m.rankLabel)}${m.guest ? ' · ' + t('guest_tag') : ''}</span></td>
-      <td>${m.sprays || 0}</td>
+      <td><span class="pill">${esc(m.rankLabel)}${m.guest ? ' · ' + et('guest_tag') : ''}</span></td>
+      <td>${num(m.sprays)}</td>
     </tr>`).join('')}</tbody>
   </table>`;
 }
 
 function summon() {
-  if (S.isGuest) return `<div class="card">${t('summon_need_rank')}</div>`;
-  return `<div class="card"><p>${t('summon_hint')}</p><br/><button class="btn" data-act='{"a":"summon"}'>${t('send_summon')}</button></div>`;
+  if (S.isGuest) return `<div class="card">${et('summon_need_rank')}</div>`;
+  return `<div class="card"><p>${et('summon_hint')}</p><br/><button class="btn" data-act='{"a":"summon"}'>${et('send_summon')}</button></div>`;
 }
 
 function guest() {
-  let html = `<div class="card"><p>${t('invite_guest')}</p>`;
+  let html = `<div class="card"><p>${et('invite_guest')}</p>`;
   if (S.isLeader) {
-    html += `<br/><input class="search" id="guest-id" placeholder="${t('invite_guest')}"/>
-      <button class="btn" id="guest-go">${t('invite_guest')}</button>`;
+    html += `<br/><input class="search" id="guest-id" placeholder="${et('invite_guest')}"/>
+      <button class="btn" id="guest-go">${et('invite_guest')}</button>`;
   }
   html += '</div>';
   html += (S.guests || []).map((g) => `<div class="log"><b>${esc(g.name)}</b>
-    ${S.isLeader ? `<button class="manage" data-act='{"a":"removeGuest","identifier":"${esc(g.identifier)}"}'>${t('remove')}</button>` : ''}
-  </div>`).join('') || `<div class="xp">${t('none')}</div>`;
+    ${S.isLeader ? `<button class="manage" data-act='{"a":"removeGuest","identifier":"${esc(g.identifier)}"}'>${et('remove')}</button>` : ''}
+  </div>`).join('') || `<div class="xp">${et('none')}</div>`;
   return html;
 }
 
 function sprayPage() {
-  if (S.isGuest) return `<div class="card">${t('guest_no_spray')}</div>`;
+  if (S.isGuest) return `<div class="card">${et('guest_no_spray')}</div>`;
   return `<div class="card">
-      <p>${t('spray_hint')}</p>
-      <p class="hint">${t('spray_wall_hint')}</p>
-      <button class="btn2" id="mfree">${t('spray_free')}</button>
-      <button class="btn2" id="mtext">${t('spray_text')}</button>
+      <p>${et('spray_hint')}</p>
+      <p class="hint">${et('spray_wall_hint')}</p>
+      <button class="btn2" id="mfree">${et('spray_free')}</button>
+      <button class="btn2" id="mtext">${et('spray_text')}</button>
       <canvas id="spray-cv" width="900" height="280"></canvas>
-      <input class="inp hidden" id="stxt" maxlength="28" placeholder="${t('text_placeholder')}"/>
+      <input class="inp hidden" id="stxt" maxlength="28" placeholder="${et('text_placeholder')}"/>
     </div>`;
 }
 
@@ -476,7 +537,7 @@ function iconGangId() {
 
 function compressIcon(file) {
   return new Promise((resolve, reject) => {
-    if (!file || !/^image\/(png|jpeg|jpg|webp)$/i.test(file.type)) {
+    if (!file || !/^image\/(png|jpeg|jpg)$/i.test(file.type)) {
       reject('icon_bad_type');
       return;
     }
@@ -495,8 +556,8 @@ function compressIcon(file) {
       URL.revokeObjectURL(url);
       let out = '';
       try { out = c.toDataURL('image/jpeg', 0.82); } catch (err) { out = ''; }
-      if (!out || out.length < 32) out = c.toDataURL('image/png');
-      if (out.length > 700000) reject('icon_too_big');
+      if (!safeImg(out)) reject('icon_bad_type');
+      else if (out.length > 700000) reject('icon_too_big');
       else resolve(out);
     };
     img.onerror = () => { URL.revokeObjectURL(url); reject('icon_bad_type'); };
@@ -565,7 +626,7 @@ function bindSprayPage() {
 
 function notifs() {
   const rows = S.notifs || [];
-  if (!rows.length) return `<div class="card">${t('no_notifs')}</div>`;
+  if (!rows.length) return `<div class="card">${et('no_notifs')}</div>`;
   return rows.map((n) => {
     const key = n.title || n.type || '';
     const title = t(key) !== key ? t(key) : (t('act_' + key) !== ('act_' + key) ? t('act_' + key) : key);
@@ -575,20 +636,20 @@ function notifs() {
 }
 
 function logs() {
-  if (!S.isLeader && !S.isAdmin) return `<div class="card">${t('logs_only')}</div>`;
+  if (!S.isLeader && !S.isAdmin) return `<div class="card">${et('logs_only')}</div>`;
   const sprays = S.isAdmin ? (S.adminSprays || S.sprayLog || []) : (S.sprayLog || []);
   const acts = S.activityLog || [];
-  let html = `<p class="hint">${t('logs_only')}</p><div class="card"><b>${t('spray_log')}</b></div>`;
+  let html = `<p class="hint">${et('logs_only')}</p><div class="card"><b>${et('spray_log')}</b></div>`;
   html += sprays.length ? sprays.map((r) => `<div class="log">
       <b>${esc(r.player_name || '')}${r.gang_label ? ' · ' + esc(r.gang_label) : ''}</b>
-      <div class="xp">${r.mode === 'text' ? t('mode_text') : t('mode_free')} · ${esc(r.text_content || '')} · ${esc(r.created_at || '')}</div>
-      <button class="manage" data-act='{"a":"deleteSpray","id":${r.id}}'>${t('delete')}</button>
-    </div>`).join('') : `<div class="xp">${t('no_log')}</div>`;
-  html += `<div class="log"><b>${t('activity_log')}</b></div>`;
+      <div class="xp">${r.mode === 'text' ? et('mode_text') : et('mode_free')} · ${esc(r.text_content || '')} · ${esc(r.created_at || '')}</div>
+      <button class="manage" data-act='{"a":"deleteSpray","id":${num(r.id)}}'>${et('delete')}</button>
+    </div>`).join('') : `<div class="xp">${et('no_log')}</div>`;
+  html += `<div class="log"><b>${et('activity_log')}</b></div>`;
   html += acts.length ? acts.map((r) => `<div class="log">
       <b>${esc(t('act_' + r.action) === 'act_' + r.action ? r.action : t('act_' + r.action))}</b>
       <div class="xp">${esc(r.actor_name || '')} · ${esc(r.detail || '')} · ${esc(r.created_at || '')}</div>
-    </div>`).join('') : `<div class="xp">${t('no_activity')}</div>`;
+    </div>`).join('') : `<div class="xp">${et('no_activity')}</div>`;
   return html;
 }
 
@@ -596,55 +657,55 @@ function iconEditor() {
   const can = S.isLeader || (S.isAdmin && S.gang);
   if (!can && !S.isAdmin) return '';
   const icons = (S.icons || []).map((ic) =>
-    `<option value="${ic.id}">${lang === 'ar' ? ic.ar : ic.en}</option>`
+    `<option value="${esc(ic.id)}">${esc(lang === 'ar' ? ic.ar : ic.en)}</option>`
   ).join('');
   const g = S.gang || {};
   const live = safeImg(g.iconImage);
   const pend = safeImg(g.pendingIconImage);
-  return `<div class="card"><b>${t('icon')}</b>
-      <p class="hint">${t('icon_upload_hint')}</p>
+  return `<div class="card"><b>${et('icon')}</b>
+      <p class="hint">${et('icon_upload_hint')}</p>
       <select class="inp" id="icon-sel">${icons}</select>
-      <input type="file" id="iconfile" accept="image/png,image/jpeg,image/webp" class="hidden"/>
+      <input type="file" id="iconfile" accept="image/png,image/jpeg" class="hidden"/>
       <div class="row">
-        <button class="btn" id="icon-upload" type="button">${t('upload_icon')}</button>
-        <button class="btn2" id="icon-go" type="button">${t('request_icon')}</button>
+        <button class="btn" id="icon-upload" type="button">${et('upload_icon')}</button>
+        <button class="btn2" id="icon-go" type="button">${et('request_icon')}</button>
       </div>
-      <p class="hint">${t('icon_blip_note')}</p>
+      <p class="hint">${et('icon_blip_note')}</p>
       <div class="row">
-        ${live ? `<div><div class="lbl">${t('icon_preview')}</div><img class="icon-prev" alt="" src="${live}"/></div>` : ''}
-        ${pend ? `<div><div class="lbl">${t('pending')}</div><img class="icon-prev" alt="" src="${pend}"/></div>` : ''}
+        ${live ? `<div><div class="lbl">${et('icon_preview')}</div><img class="icon-prev" alt="" src="${live}"/></div>` : ''}
+        ${pend ? `<div><div class="lbl">${et('pending')}</div><img class="icon-prev" alt="" src="${pend}"/></div>` : ''}
       </div>
     </div>`;
 }
 
 function leader() {
-  if (!S.isLeader && !(S.isAdmin && S.gang)) return `<div class="card">${t('not_leader')}</div>`;
+  if (!S.isLeader && !(S.isAdmin && S.gang)) return `<div class="card">${et('not_leader')}</div>`;
   const colors = (S.colors || []).map((c) =>
-    `<button class="swatch" data-act='{"a":"setColor","color":"${c.id}"}' style="background:${c.hex}" title="${lang === 'ar' ? c.ar : c.en}"></button>`
+    `<button class="swatch" data-act='{"a":"setColor","color":"${esc(c.id)}"}' style="background:${safeHex(c.hex)}" title="${esc(lang === 'ar' ? c.ar : c.en)}"></button>`
   ).join(' ');
   const mem = (S.members || []).filter((m) => !m.guest).map((m) => `<div class="log">
     ${esc(m.name)} · ${esc(m.rankLabel)}
-    <button class="btn2" data-act='{"a":"setRank","identifier":"${esc(m.identifier)}","rank":${Math.min((m.rank || 1) + 1, 4)}}'>${t('promote')}</button>
-    <button class="btn2" data-act='{"a":"setRank","identifier":"${esc(m.identifier)}","rank":${Math.max((m.rank || 1) - 1, 1)}}'>${t('demote')}</button>
-    <button class="manage" data-act='{"a":"kick","identifier":"${esc(m.identifier)}"}'>${t('kick')}</button>
+    <button class="btn2" data-act='{"a":"setRank","identifier":"${esc(m.identifier)}","rank":${Math.min(num(m.rank, 1) + 1, 4)}}'>${et('promote')}</button>
+    <button class="btn2" data-act='{"a":"setRank","identifier":"${esc(m.identifier)}","rank":${Math.max(num(m.rank, 1) - 1, 1)}}'>${et('demote')}</button>
+    <button class="manage" data-act='{"a":"kick","identifier":"${esc(m.identifier)}"}'>${et('kick')}</button>
   </div>`).join('');
   return `<div class="grid2">
-      <div class="card"><b>${t('set_hq')}</b><p class="hint">${t('color')}</p>
-        <button class="btn" data-act='{"a":"setHQ"}'>${t('set_hq')}</button>
-        <p class="hint">${t('color')}</p>
+      <div class="card"><b>${et('set_hq')}</b><p class="hint">${et('color')}</p>
+        <button class="btn" data-act='{"a":"setHQ"}'>${et('set_hq')}</button>
+        <p class="hint">${et('color')}</p>
         <div class="row">${colors}</div>
       </div>
       ${iconEditor()}
     </div>
-    <div class="card"><b>${t('announce')}</b><input class="inp" id="ann" placeholder="${t('announce')}"/><button class="btn" id="ann-go">${t('announce')}</button></div>
-    <div class="card"><b>${t('members')}</b>${mem}
-      <button class="btn no" data-act='{"a":"wipeGangSprays"}'>${t('wipe_gang_sprays')}</button>
+    <div class="card"><b>${et('announce')}</b><input class="inp" id="ann" placeholder="${et('announce')}"/><button class="btn" id="ann-go">${et('announce')}</button></div>
+    <div class="card"><b>${et('members')}</b>${mem}
+      <button class="btn no" data-act='{"a":"wipeGangSprays"}'>${et('wipe_gang_sprays')}</button>
     </div>`;
 }
 
 function admin() {
-  if (!S.isAdmin) return `<div class="card">${t('not_admin')}</div>`;
-  const gangs = (S.gangs || []).map((g) => `<option value="${g.id}">${esc(g.label)}</option>`).join('');
+  if (!S.isAdmin) return `<div class="card">${et('not_admin')}</div>`;
+  const gangs = (S.gangs || []).map((g) => `<option value="${num(g.id)}">${esc(g.label)}</option>`).join('');
   const pending = (S.pendingIcons || []).map((p) => {
     const img = safeImg(p.pendingImage) || safeImg(p.currentImage);
     const nextLabel = p.pendingImage ? t('icon_image_pending') : iconLabel(p.pending);
@@ -654,35 +715,35 @@ function admin() {
         <div class="xp">${esc(iconLabel(p.current) || t('none'))} → ${esc(nextLabel)}</div>
       </div>
       <div>
-        <button class="btn ok" data-act='{"a":"approveIcon","gangId":${p.id}}'>${t('approve')}</button>
-        <button class="btn no" data-act='{"a":"rejectIcon","gangId":${p.id}}'>${t('reject')}</button>
+        <button class="btn ok" data-act='{"a":"approveIcon","gangId":${num(p.id)}}'>${et('approve')}</button>
+        <button class="btn no" data-act='{"a":"rejectIcon","gangId":${num(p.id)}}'>${et('reject')}</button>
       </div>
     </div>`;
-  }).join('') || `<div class="xp">${t('none')}</div>`;
+  }).join('') || `<div class="xp">${et('none')}</div>`;
   return `<div class="grid2">
-      <div class="card"><b>${t('create_gang')}</b>
-        <input class="inp" id="g-name" placeholder="${t('name')}"/>
-        <input class="inp" id="g-label" placeholder="${t('label')}"/>
-        <input class="inp" id="g-tag" placeholder="${t('tag')}"/>
-        <button class="btn" id="g-create">${t('create_gang')}</button>
+      <div class="card"><b>${et('create_gang')}</b>
+        <input class="inp" id="g-name" placeholder="${et('name')}"/>
+        <input class="inp" id="g-label" placeholder="${et('label')}"/>
+        <input class="inp" id="g-tag" placeholder="${et('tag')}"/>
+        <button class="btn" id="g-create">${et('create_gang')}</button>
       </div>
-      <div class="card"><b>${t('set_leader')}</b>
+      <div class="card"><b>${et('set_leader')}</b>
         <select class="inp" id="g-sel">${gangs}</select>
         <input class="inp" id="g-sid" placeholder="ID"/>
-        <button class="btn" id="g-leader">${t('set_leader')}</button>
-        <button class="btn2" id="g-clear-leader">${t('clear_leader')}</button>
-        <button class="btn2" id="g-add">${t('add_member')}</button>
-        <button class="btn no" id="g-del">${t('delete_gang')}</button>
+        <button class="btn" id="g-leader">${et('set_leader')}</button>
+        <button class="btn2" id="g-clear-leader">${et('clear_leader')}</button>
+        <button class="btn2" id="g-add">${et('add_member')}</button>
+        <button class="btn no" id="g-del">${et('delete_gang')}</button>
       </div>
     </div>
     ${iconEditor()}
     ${zoneAdmin()}
-    <div class="card"><b>${t('pending_icons')}</b>${pending}</div>
-    <div class="card"><b>${t('all_sprays')}</b>
-      <button class="btn2" id="g-wipe">${t('wipe_gang_sprays')}</button>
-      <input class="inp" id="g-pts" placeholder="${t('points')}"/>
-      <button class="btn2" id="g-pts-go">${t('adjust_points')}</button>
-      <button class="btn no" id="wipe-all">${t('wipe_all_sprays')}</button>
+    <div class="card"><b>${et('pending_icons')}</b>${pending}</div>
+    <div class="card"><b>${et('all_sprays')}</b>
+      <button class="btn2" id="g-wipe">${et('wipe_gang_sprays')}</button>
+      <input class="inp" id="g-pts" placeholder="${et('points')}"/>
+      <button class="btn2" id="g-pts-go">${et('adjust_points')}</button>
+      <button class="btn no" id="wipe-all">${et('wipe_all_sprays')}</button>
     </div>`;
 }
 
@@ -708,9 +769,9 @@ function render() {
 }
 
 function openTablet(data) {
-  S = data;
-  lang = data.lang || 'ar';
-  S.strings = data.strings || S.strings;
+  S = scrubTablet(data || {});
+  lang = S.lang === 'en' ? 'en' : 'ar';
+  S.strings = S.strings || {};
   setDir();
   $('tablet').hidden = false;
   page = 'home';
@@ -822,8 +883,9 @@ $('summon-ok').onclick = () => post('acceptSummon');
 $('summon-no').onclick = () => post('ignoreSummon');
 
 function showSummon(d) {
+  d = d || {};
   $('summon-title').textContent = (d.strings && d.strings.summon_banner) || t('summon_banner');
-  $('summon-sub').textContent = d.caller || '';
+  $('summon-sub').textContent = String(d.caller || '');
   $('summon-ok').textContent = (d.strings && d.strings.accept) || t('accept');
   $('summon-no').textContent = (d.strings && d.strings.ignore) || t('ignore');
   $('summon').hidden = false;
@@ -884,11 +946,11 @@ window.addEventListener('message', (e) => {
   const d = e.data || {};
   if (d.action === 'openTablet') openTablet(d.data);
   if (d.action === 'close') $('tablet').hidden = true;
-  if (d.action === 'toast') toast(d.data.text);
+  if (d.action === 'toast') toast(String((d.data && d.data.text) || ''));
   if (d.action === 'summon') showSummon(d.data);
   if (d.action === 'hideSummon') $('summon').hidden = true;
   if (d.action === 'openSpray') {
-    hex = (d.data && d.data.hex) || '#3b7ac4';
+    hex = safeHex((d.data && d.data.hex) || '#3b7ac4');
     S.strings = (d.data && d.data.strings) || S.strings;
     $('mode-free').textContent = t('spray_free');
     $('mode-text').textContent = t('spray_text');
@@ -930,10 +992,10 @@ if (MOCK) {
     spray_hint: 'وضعين: رسم حر أو كتابة. بدون رفع صور. الكلام الوسخ ينحجب.',
     spray_wall_hint: 'البخ الحقيقي على الجدار بعلبة البخاخ. هالصفحة للتجربة داخل التابلت.',
     logs_only: 'السجلات لليدر والإدارة فقط.', request_icon: 'طلب الأيقونة',
-    icon_upload_hint: 'ارفع صورة الأيقونة (PNG/JPEG). ما تظهر إلا بعد موافقة الأدمن.',
+    icon_upload_hint: 'ارفع أيقونة PNG أو JPG ثابتة. ما في فيديو ولا مقاطع. ما تظهر إلا بعد موافقة الأدمن.',
     upload_icon: 'رفع أيقونة', icon_blip_note: 'الأيقونة تظهر على الخريطة بعد الموافقة.',
     icon_preview: 'معاينة', icon_pending: 'بانتظار موافقة الأدمن',
-    icon_image_pending: 'صورة مرفوعة', icon_bad_type: 'نوع الصورة غلط', icon_too_big: 'الصورة أكبر من المسموح',
+    icon_image_pending: 'صورة مرفوعة', icon_bad_type: 'png أو jpg فقط. بدون فيديو.', icon_too_big: 'الصورة أكبر من المسموح',
     guest_no_spray: 'الضيف ما يقدر يبخ.', not_leader: 'هالخيار للقائد فقط.', not_admin: 'هالخيار للأدمن فقط.',
     no_notifs: 'ما في تنويهات.', all_sprays: 'كل البخاخات',
     activity_log: 'سجل النشاط', no_activity: 'ما في نشاط.', clear_leader: 'إزالة القائد',

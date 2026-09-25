@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: https://raw.githubusercontent.com https://github.com; media-src 'none'; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'" />
   <title>WSMM GANGS</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@500;600;700;800&display=swap" rel="stylesheet" />
@@ -189,6 +190,23 @@
     </aside>
   </div>
   <script>
+    function esc(s) {
+      return String(s == null ? '' : s)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    }
+    function safeImg(src) {
+      if (typeof src !== 'string' || src.length < 32 || src.length > 700000) return '';
+      const comma = src.indexOf(',');
+      if (comma < 12) return '';
+      const head = src.slice(0, comma).toLowerCase();
+      if (head !== 'data:image/png;base64' && head !== 'data:image/jpeg;base64') return '';
+      const b64 = src.slice(comma + 1);
+      if (!/^[A-Za-z0-9+/]+=*$/.test(b64)) return '';
+      if (head.indexOf('png') !== -1 && b64.indexOf('iVBOR') !== 0) return '';
+      if (head.indexOf('jpeg') !== -1 && b64.indexOf('/9j/') !== 0) return '';
+      return 'data:image/' + (head.indexOf('png') !== -1 ? 'png' : 'jpeg') + ';base64,' + b64;
+    }
     const gangs = [
       { name: 'آل فخامة', tag: 'DARK', xp: 35135, sprays: 12, place: 1, color: '#e74c3c' },
       { name: 'بلوود', tag: 'BLOOD', xp: 33645, sprays: 12, place: 2, color: '#9b1c2c' },
@@ -242,13 +260,13 @@
     const toast = (t) => { const n = document.createElement('div'); n.textContent = t; n.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#2c639b;padding:10px 16px;border-radius:10px;z-index:9;font-weight:800'; document.body.appendChild(n); setTimeout(() => n.remove(), 1600); };
     const sprayLog = [
       { who: 'حمود', mode: 'text', text: 'WLF', where: 'قروف ستريت', when: 'الآن' },
-      { who: 'سالم', mode: 'draw', img: "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 100'><rect width='180' height='100' fill='%230c0c0c'/><path d='M20 80 Q60 10 90 55 T160 30' fill='none' stroke='%23e74c3c' stroke-width='6' stroke-linecap='round'/></svg>", where: 'ديفيس', when: 'أمس' }
+      { who: 'سالم', mode: 'text', text: 'DARK', where: 'ديفيس', when: 'أمس' }
     ];
     function sprayCard(s, i) {
       const art = s.mode === 'text'
-        ? `<div class="spray-thumb wall-text">${s.text || ''}</div>`
-        : `<img class="spray-thumb" alt="رسم" src="${s.img}" />`;
-      return `<div class="log spray-item">${art}<div><b>${s.who}</b><div class="xp">${s.mode==='text'?'كتابة':'رسم حر'} · ${s.where} · ${s.when}</div></div><button class="manage" data-act="dels" data-i="${i}">حذف</button></div>`;
+        ? `<div class="spray-thumb wall-text">${esc(s.text || '')}</div>`
+        : (safeImg(s.img) ? `<img class="spray-thumb" alt="" src="${safeImg(s.img)}" />` : `<div class="spray-thumb wall-text">رسم</div>`);
+      return `<div class="log spray-item">${art}<div><b>${esc(s.who)}</b><div class="xp">${s.mode==='text'?'كتابة':'رسم حر'} · ${esc(s.where)} · ${esc(s.when)}</div></div><button class="manage" data-act="dels" data-i="${i}">حذف</button></div>`;
     }
 
     function syncRail() {
@@ -338,11 +356,11 @@
             ? `left:${z.l}%;top:${z.t}%;width:${z.w}%;height:${z.h}%;--c:${z.c};border-color:${z.c}`
             : `left:${z.l}%;top:${z.t}%;width:${z.w}%;height:${z.h}%`;
           return `<div class="${cls}" data-act="zone" data-i="${i}" style="${style}">
-            ${claimedZone ? `<span class="lab">${z.owner}</span>` : ''}
+            ${claimedZone ? `<span class="lab">${esc(z.owner)}</span>` : ''}
           </div>`;
         }).join('')}${draft}
         ${claimed.length ? `<div class="legend"><b>مناطق العصابات</b>
-          ${claimed.map(z => `<div><i style="background:${z.c}"></i> ${z.name} — ${z.owner}</div>`).join('')}
+          ${claimed.map(z => `<div><i style="background:${esc(z.c)}"></i> ${esc(z.name)} — ${esc(z.owner)}</div>`).join('')}
         </div>` : ''}
       </div>
       <p class="hint">${drawingZone ? 'اكتب الاسم، بعدين اسحب مربع على الخريطة، وبعدين احفظ.' : 'خريطة لوس سانتوس: المربع الملوّن = تيرف عصيبة. المتقطع = مفتوح فاضي. المقفول نظيف بدون رسم.'}</p>
@@ -355,7 +373,7 @@
             <button class="btn2" data-act="cancelz">إلغاء الرسم</button>
           </div>` : ''}
         ${zones.map((z,i)=>`<div class="log" style="display:flex;justify-content:space-between;gap:8px;align-items:center">
-          <div><b>${z.name}</b> · ${z.owner || 'فاضي'} · ${z.open?'مفتوحة للمطالبة':'مقفلة'}${z.custom?' · مخصصة':''}</div>
+          <div><b>${esc(z.name)}</b> · ${esc(z.owner || 'فاضي')} · ${z.open?'مفتوحة للمطالبة':'مقفلة'}${z.custom?' · مخصصة':''}</div>
           <div>
             <button class="btn2" data-act="togglez" data-i="${i}">${z.open?'قفل':'فتح'}</button>
             ${z.custom ? `<button class="btn no" data-act="delz" data-i="${i}">حذف المنطقة</button>` : ''}
@@ -379,11 +397,11 @@
         <div class="card"><b>أيقونة الخريطة</b>
           <p class="hint">ارفع صورة، أو اختر أيقونة جاهزة. ما تظهر إلا بعد موافقة الإدارة.</p>
           <select class="inp"><option>عصابة</option><option>جمجمة</option><option>تاج</option><option>سلاح</option></select>
-          <input type="file" id="iconfile" accept="image/png,image/jpeg,image/webp" class="hidden" />
+          <input type="file" id="iconfile" accept="image/png,image/jpeg" class="hidden" />
           <button class="btn" data-act="uploadicon">رفع صورة</button>
           <button class="btn2" data-act="icon">إرسال للموافقة</button>
           <div class="hint" style="margin-top:8px">معاينة</div>
-          <img id="iconprev" class="spray-thumb" alt="أيقونة" src="${g.iconImg || ''}" style="${g.iconImg?'':'display:none'}" />
+          <img id="iconprev" class="spray-thumb" alt="أيقونة" src="${safeImg(g.iconImg) || ''}" style="${safeImg(g.iconImg)?'':'display:none'}" />
         </div>
         </div>
         <div class="card"><b>أعضاء ${g.name}</b>
@@ -466,7 +484,7 @@
         </div>`).join('')}
         <div class="card"><b>أيقونات معلّقة</b>
           <div class="log spray-item">
-            <img class="spray-thumb" alt="" src="${gangs[0].iconImg || ''}" style="${gangs[0].iconImg?'':'display:none'}" />
+            <img class="spray-thumb" alt="" src="${safeImg(gangs[0].iconImg) || ''}" style="${safeImg(gangs[0].iconImg)?'':'display:none'}" />
             <div>آل فخامة: صورة مرفوعة / تاج</div>
             <div>
               <button class="btn ok" data-act="yes">موافقة</button>
@@ -565,10 +583,13 @@
       const iconfile = document.getElementById('iconfile');
       if (iconfile) iconfile.onchange = () => {
         const file = iconfile.files && iconfile.files[0]; if (!file) return;
+        if (!/^image\/(png|jpeg|jpg)$/i.test(file.type)) { toast('png أو jpg فقط — بدون فيديو'); return; }
         const r = new FileReader();
         r.onload = () => {
+          const src = safeImg(r.result);
+          if (!src) { toast('png أو jpg فقط — بدون فيديو'); return; }
           const g = inspectGang || gangs[0];
-          g.iconImg = r.result;
+          g.iconImg = src;
           render();
           toast('الصورة انرفعت — تنتظر موافقة الإدارة');
         };

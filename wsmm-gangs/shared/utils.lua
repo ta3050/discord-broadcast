@@ -155,9 +155,20 @@ function WGCompactStrokes(strokes)
     return compact
 end
 
+function WGSafeHex(hex)
+    if type(hex) ~= 'string' then return '#3b7ac4' end
+    if hex:match('^#%x%x%x$') or hex:match('^#%x%x%x%x%x%x$') then
+        return hex
+    end
+    return '#3b7ac4'
+end
+
 function WGHexToRgb(hex)
-    hex = (hex or '#3b7ac4'):gsub('#', '')
-    return tonumber(hex:sub(1, 2), 16) or 231, tonumber(hex:sub(3, 4), 16) or 76, tonumber(hex:sub(5, 6), 16) or 60
+    hex = WGSafeHex(hex):gsub('#', '')
+    if #hex == 3 then
+        hex = hex:sub(1, 1):rep(2) .. hex:sub(2, 2):rep(2) .. hex:sub(3, 3):rep(2)
+    end
+    return tonumber(hex:sub(1, 2), 16) or 44, tonumber(hex:sub(3, 4), 16) or 99, tonumber(hex:sub(5, 6), 16) or 155
 end
 
 function WGNormalize(text)
@@ -167,30 +178,88 @@ function WGNormalize(text)
     return text
 end
 
+local B64VAL = {}
+do
+    local abc = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
+    for i = 1, #abc do
+        B64VAL[abc:byte(i)] = i - 1
+    end
+end
+
+-- Stream-decode base64 and look for an ASCII needle (APNG acTL / WebP ANIM).
+local function b64HasAscii(b64, needle)
+    if type(b64) ~= 'string' or type(needle) ~= 'string' or needle == '' then return false end
+    local nlen = #needle
+    local window, buf, bits, decoded = '', 0, 0, 0
+    local maxDecoded = 540000
+    for i = 1, #b64 do
+        local c = b64:byte(i)
+        if c == 61 then break end
+        local v = B64VAL[c]
+        if v then
+            buf = buf * 64 + v
+            bits = bits + 6
+            if bits >= 8 then
+                bits = bits - 8
+                window = window .. string.char(math.floor(buf / (2 ^ bits)) % 256)
+                buf = buf % (2 ^ bits)
+                decoded = decoded + 1
+                if #window > nlen then window = window:sub(-nlen) end
+                if window == needle then return true end
+                if decoded >= maxDecoded then break end
+            end
+        end
+    end
+    return false
+end
+
 function WGSanitizeIconDataUrl(s)
     if type(s) ~= 'string' then return nil end
     local maxUrl = (Config.IconUpload and Config.IconUpload.maxDataUrl) or 700000
     local maxBytes = (Config.IconUpload and Config.IconUpload.maxBytes) or (512 * 1024)
     if #s < 32 or #s > maxUrl then return nil end
-    local mime, b64 = s:match('^data:(image/[%w%+%.%-]+);base64,([A-Za-z0-9+/=]+)$')
+    local head = s:match('^([^,]+),')
+    if not head then return nil end
+    local lowHead = head:lower()
+    if lowHead:find('svg', 1, true) or lowHead:find('xml', 1, true) or lowHead:find('html', 1, true) then return nil end
+    if lowHead:find('video', 1, true) or lowHead:find('audio', 1, true) or lowHead:find('script', 1, true) then return nil end
+    local mime, b64 = s:match('^data:(image/[%w]+);base64,([A-Za-z0-9+/=]+)$')
     if not mime or not b64 then return nil end
     mime = mime:lower()
     if mime == 'image/jpg' then mime = 'image/jpeg' end
+    if mime ~= 'image/png' and mime ~= 'image/jpeg' then return nil end
     local allowed = Config.IconUpload and Config.IconUpload.mime
-    if not allowed or not allowed[mime] then return nil end
+    if allowed and not allowed[mime] then return nil end
     local approx = math.floor(#b64 * 3 / 4)
     if approx > maxBytes then return nil end
-    if mime == 'image/png' and not b64:find('^iVBOR') then return nil end
-    if mime == 'image/jpeg' and not b64:find('^/9j/') then return nil end
-    if mime == 'image/webp' and not b64:find('^UklGR') then return nil end
+    if mime == 'image/png' then
+        if not b64:find('^iVBOR') then return nil end
+        if b64HasAscii(b64, 'acTL') then return nil end
+    elseif mime == 'image/jpeg' then
+        if not b64:find('^/9j/') then return nil end
+    else
+        return nil
+    end
     return 'data:' .. mime .. ';base64,' .. b64
 end
+
+local MEDIA_TOKENS = {
+    'iframe', 'youtube', 'youtu', 'vimeo', 'tiktok', 'twitch', 'dailymotion',
+    'mp4', 'webm', 'm3u8', 'mkv', 'embed', 'javascript', 'onerror', 'onload',
+    'blob', 'video', 'audio', 'script', 'srcdoc', 'object', 'applet',
+    'data video', 'data audio', 'data image', 'base64'
+}
 
 function WGBanned(text)
     if not text or text == '' then return false end
     local n = WGNormalize(text)
-    if n:find('http', 1, true) or n:find('data:image', 1, true) or n:find('base64', 1, true) then
+    if n:find('http', 1, true) then
         return true
+    end
+    for i = 1, #MEDIA_TOKENS do
+        if n:find(MEDIA_TOKENS[i], 1, true) then
+            return true
+        end
     end
     for i = 1, #Config.BannedWords do
         if n:find(Config.BannedWords[i], 1, true) then
@@ -198,4 +267,27 @@ function WGBanned(text)
         end
     end
     return false
+end
+
+local IMAGE_KEYS = {
+    iconImage = true, pendingIconImage = true, currentImage = true, pendingImage = true,
+    icon_image = true, pending_icon_image = true
+}
+
+function WGScrubTablet(data)
+    if type(data) ~= 'table' then return data end
+    local function walk(t, depth)
+        if type(t) ~= 'table' or (depth or 0) > 6 then return end
+        for k, v in pairs(t) do
+            if IMAGE_KEYS[k] then
+                t[k] = WGSanitizeIconDataUrl(v)
+            elseif k == 'hex' then
+                t[k] = WGSafeHex(v)
+            elseif type(v) == 'table' then
+                walk(v, (depth or 0) + 1)
+            end
+        end
+    end
+    walk(data, 0)
+    return data
 end
