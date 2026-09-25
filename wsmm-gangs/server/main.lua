@@ -944,6 +944,7 @@ end)
 CreateThread(function()
     waitESX()
     WGEnsureSchema()
+    WGEnsureItems()
     WG.Reload()
     WG.LoadZones()
 
@@ -955,6 +956,8 @@ CreateThread(function()
             TriggerClientEvent('wsmm_gangs:trySpray', source)
         end)
     end)
+    print('^2[WSMM GANGS]^7 جاهز. حط في server.cfg: ensure oxmysql / ensure es_extended / ensure wsmm-gangs')
+    print('^2[WSMM GANGS]^7 الأدمن: F10 أو /gangadmin — بعدين أنشئ عصابة وعيّن قائد.')
 
     for _, xP in ipairs(players()) do
         if xP and xP.source then

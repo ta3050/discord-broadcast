@@ -8,6 +8,8 @@ Config.AdminKey = 'F10'
 
 Config.TabletItem = 'gang_tablet'
 Config.SprayItem = 'gang_spray'
+-- On first start: create tables, insert ESX items, and append ox_inventory items if missing.
+Config.AutoInstallItems = true
 
 Config.Ranks = {
     [1] = { ar = 'عضو', en = 'Member' },

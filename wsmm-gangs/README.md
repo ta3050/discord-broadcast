@@ -10,19 +10,16 @@ Standalone FiveM resource. **No Discord** — no webhooks, no bot, no off-tablet
 
 ## Install
 
-1. Copy `wsmm-gangs` into your server `resources` folder.
-2. Items:
-   - ESX: run `sql/items.sql`
-   - ox_inventory: copy entries from `install/ox_inventory_items.lua`
-3. `server.cfg`:
+1. Copy the `wsmm-gangs` folder into your server `resources` folder.
+2. Add this to `server.cfg` (after oxmysql and es_extended):
    ```
    ensure oxmysql
    ensure es_extended
    ensure wsmm-gangs
    ```
-4. Admin (group `admin` / `superadmin` / ACE `wsmmgangs.admin`) opens the tablet with **F10** or `/gangadmin` and creates a gang, then assigns a leader.
+3. Restart the server once.
 
-Tables are created automatically on start.
+Tables, ESX `items` rows, and ox_inventory item entries are created automatically on first start (`Config.AutoInstallItems`). Admin (group `admin` / `superadmin` / ACE `wsmmgangs.admin`) opens the tablet with **F10** or `/gangadmin`, creates a gang, then assigns a leader.
 
 `ox_lib` is **not** required.
 
